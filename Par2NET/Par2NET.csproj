@@ -1,0 +1,88 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{E05C1D72-80B5-4B77-829D-CCE04D545F65}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Par2NET</RootNamespace>
+    <AssemblyName>Par2NET</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile>
+    </TargetFrameworkProfile>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>DEBUG</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="BinaryStreamReader.cs" />
+    <Compile Include="FileChecker.cs" />
+    <Compile Include="Packets\CreatorPacket.cs" />
+    <Compile Include="Packets\DataBlock.cs" />
+    <Compile Include="Packets\FileDescriptionPacket.cs" />
+    <Compile Include="Packets\FileVerificationPacket.cs" />
+    <Compile Include="Packets\IPar2Packet.cs" />
+    <Compile Include="Packets\MainPacket.cs" />
+    <Compile Include="Packets\RecoveryPacket.cs" />
+    <Compile Include="Par1Library.cs" />
+    <Compile Include="Par2FileReader.cs" />
+    <Compile Include="Par2RecoveryCollection.cs" />
+    <Compile Include="Par2RecoverySet.cs" />
+    <Compile Include="TasksHelper\CRC32TasksHelper.cs" />
+    <Compile Include="Par2Library.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="TasksHelper\MD5TasksHelper.cs" />
+    <Compile Include="TasksHelper\ToolkitTasksHelper.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CRC32NET\CRC32NET.csproj">
+      <Project>{2A96AA60-7D5B-49CC-B1A5-C3D8E4975A29}</Project>
+      <Name>CRC32NET</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Tests\EntLib50.chm" />
+    <None Include="Tests\EntLib50.chm.par2" />
+    <None Include="Tests\EntLib50.chm.vol0+1.PAR2" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="CRCs_Hashs.txt" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
