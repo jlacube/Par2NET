@@ -6,6 +6,8 @@ _ReSharper.*
 *.csproj.user
 *.resharper.user
 *.resharper
+*.usertasks
+*.userprefs
 *.suo
 *.cache
 ~$*
