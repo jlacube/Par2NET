@@ -2,10 +2,11 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Par2NET.Interfaces;
 
 namespace Par2NET
 {
-    public class Par1Library
+    public class Par1Library : IParLibrary
     {
         public ParResult Process(List<string> inputFiles, List<string> recoveryFiles, ParAction action)
         {

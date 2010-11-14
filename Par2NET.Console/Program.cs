@@ -19,23 +19,27 @@ namespace Par2NET.Console
             List<string> recoveryFiles = new List<string>();
 
             //recoveryFiles.Add(@"C:\USERS\Projects\__Perso\Par2NET\Par2NET\Tests\EntLib50.vol10+10.PAR2");
-            recoveryFiles.Add(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\EntLib50.vol10+10.PAR2");
+            recoveryFiles.Add(@"C:\Documents and Settings\Jerome\My Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\EntLib50.vol10+10.PAR2");
 
-            ParResult result = library.Process(ParVersion.Par2, inputFiles, recoveryFiles, ParAction.ParVerify, @"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests");
+            ParResult result = library.Process(ParVersion.Par2, inputFiles, recoveryFiles, ParAction.ParVerify, @"C:\Documents and Settings\Jerome\My Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests");
         }
 
-        static void MainCheck(string[] args)
-        {
-            Par2Library library = new Par2Library();
+        //static void Main(string[] args)
+        //{
+        //    Par2Library library = new Par2Library();
 
-            byte[] md5hash16k;
-            byte[] md5hash;
+        //    byte[] md5hash16k;
+        //    byte[] md5hash;
 
-            FileChecker.CheckFile(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\EntLib50.chm", 384000, null, out md5hash16k, out md5hash);
+        //    DateTime start = DateTime.Now;
+        //    //FileChecker.CheckFile(@"C:\Documents and Settings\Jerome\My Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\EntLib50.chm", 384000, null, out md5hash16k, out md5hash);
+        //    //FileChecker.CheckFile(@"Z:\en_visual_studio_2010_ultimate_x86_dvd_509116.iso", 384000, null, out md5hash16k, out md5hash);
+        //    DateTime end = DateTime.Now;
+        //    TimeSpan diff = end - start;
+        //    System.Console.WriteLine("md5_16k:{0},md5:{1}", ToolKit.ToHex(md5hash16k), ToolKit.ToHex(md5hash));
 
-            //FileChecker.CheckFile(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\EntLib50_copy.chm", null, out md5hash16k, out md5hash);
-
-        }
+        //    //FileChecker.CheckFile(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\EntLib50_copy.chm", null, out md5hash16k, out md5hash);
+        //}
 
         static void MainOld2(string[] args)
         {

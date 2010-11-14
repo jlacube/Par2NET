@@ -46,6 +46,7 @@
   <ItemGroup>
     <Compile Include="BinaryStreamReader.cs" />
     <Compile Include="FileChecker.cs" />
+    <Compile Include="Interfaces\IParLibrary.cs" />
     <Compile Include="Packets\CreatorPacket.cs" />
     <Compile Include="Packets\DataBlock.cs" />
     <Compile Include="Packets\FileDescriptionPacket.cs" />
@@ -54,6 +55,7 @@
     <Compile Include="Packets\MainPacket.cs" />
     <Compile Include="Packets\RecoveryPacket.cs" />
     <Compile Include="Par1Library.cs" />
+    <Compile Include="Par2File.cs" />
     <Compile Include="Par2FileReader.cs" />
     <Compile Include="Par2RecoveryCollection.cs" />
     <Compile Include="Par2RecoverySet.cs" />
@@ -71,8 +73,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Tests\EntLib50.chm" />
-    <None Include="Tests\EntLib50.chm.par2" />
-    <None Include="Tests\EntLib50.chm.vol0+1.PAR2" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="CRCs_Hashs.txt" />

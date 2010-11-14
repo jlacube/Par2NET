@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 using System.IO;
 using System.Globalization;
 using System.Security.Cryptography;
+using Par2NET.Interfaces;
 
 namespace Par2NET
 {
@@ -69,6 +70,16 @@ namespace Par2NET
         NoMatch = 0,
         PartialMatch,
         FullMatch
+    }
+
+    public enum NoiseLevel
+    {
+        Unknown = 0,
+        Silent,       // Absolutely no output (other than errors)
+        Quiet,        // Bare minimum of output
+        Normal,       // Normal level of output
+        Noisy,        // Lots of output
+        Debug         // Extra debugging information
     }
 
     public class ToolKit
@@ -146,6 +157,12 @@ namespace Par2NET
     public class Par2Library
     {
         private static string targetPath = string.Empty;
+        private static NoiseLevel noiseLevel = NoiseLevel.Normal;
+
+        public static void SetNoiseLevel(NoiseLevel newNoiseLevel)
+        {
+            noiseLevel = newNoiseLevel;
+        }
 
         public static string ComputeTargetFileName(string filename)
         {
@@ -260,7 +277,14 @@ namespace Par2NET
 
         private ParResult Repair(ref List<string> inputFiles, ref List<string> recoveryFiles)
         {
-            throw new NotImplementedException();
+            ParResult verifyResult = Verify(ref inputFiles, ref recoveryFiles);
+
+            if (verifyResult != ParResult.Success && verifyResult != ParResult.RepairPossible)
+                return verifyResult;
+
+            // TODO: Add repair code here
+
+            return ParResult.Success;
         }
 
         private ParResult Verify(ref List<string> inputFiles, ref List<string> recoveryFiles)
@@ -287,16 +311,16 @@ namespace Par2NET
             if (!setids[setid].CreateSourceFileList())
                 return ParResult.LogicError;
 
-            foreach (FileVerification fileVer in setids[setid].FileSets.Values)
-            {
-                foreach (Packets.FileVerificationEntry entry in fileVer.FileVerificationPacket.entries)
-                {
-                    Console.WriteLine("crc32:{0},md5:{1}", entry.crc, ToolKit.ToHex(entry.hash));
-                }
-            }
+            //foreach (FileVerification fileVer in setids[setid].FileSets.Values)
+            //{
+            //    foreach (Packets.FileVerificationEntry entry in fileVer.FileVerificationPacket.entries)
+            //    {
+            //        Console.WriteLine("crc32:{0},md5:{1}", entry.crc, ToolKit.ToHex(entry.hash));
+            //    }
+            //}
 
-            if (!setids[setid].AllocateSourceBlocks())
-                return ParResult.LogicError;
+            //if (!setids[setid].AllocateSourceBlocks())
+            //    return ParResult.LogicError;
 
             //if (!setids[setid].PrepareVerificationHashTable())
             //    return ParResult.LogicError;
@@ -307,6 +331,9 @@ namespace Par2NET
             // Attempt to verify all of the source files
             if (!setids[setid].VerifySourceFiles())
                 return ParResult.LogicError;
+            
+            // TODO: Send return with
+            // ParResult.Success || ParResult.RepairPossible || ParResult.RepairNotPossible
 
             return ParResult.Success;
         }

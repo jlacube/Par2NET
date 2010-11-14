@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 
 using Par2NET.Packets;
+using System.IO;
 
 namespace Par2NET
 {
@@ -177,7 +178,32 @@ namespace Par2NET
 
         internal bool VerifySourceFiles()
         {
-            throw new NotImplementedException();
+            try
+            {
+                bool result = true;
+
+                foreach (FileVerification fileVer in SourceFiles)
+                {
+                    if (!File.Exists(fileVer.TargetFileName))
+                        continue;
+
+                    result &= (VerifyFile(fileVer) != null);
+                        
+                }   
+
+                return result;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private bool? VerifyFile(Par2NET.FileVerification fileVer)
+        {
+            FileChecker.CheckFile(fileVer.TargetFileName, (int)this.MainPacket.blocksize, fileVer.FileVerificationPacket.entries, fileVer.FileDescriptionPacket.hash16k, fileVer.FileDescriptionPacket.hashfull);
+
+            return false;
         }
     }
 }
