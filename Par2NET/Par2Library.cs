@@ -158,10 +158,16 @@ namespace Par2NET
     {
         private static string targetPath = string.Empty;
         private static NoiseLevel noiseLevel = NoiseLevel.Normal;
+        private static bool searchAllExtMisNamedFiles = false;
 
         public static void SetNoiseLevel(NoiseLevel newNoiseLevel)
         {
             noiseLevel = newNoiseLevel;
+        }
+
+        public static void SetSearchMisNamedFiles(bool value)
+        {
+            searchAllExtMisNamedFiles = value;
         }
 
         public static string ComputeTargetFileName(string filename)
@@ -327,6 +333,10 @@ namespace Par2NET
 
             //if (!setids[setid].ComputeWindowTable())
             //    return ParResult.LogicError;
+
+            // 1st a quick verify to extract basic information from files like md5 hashes to be able to match files with wrong names
+            if (!setids[setid].QuickVerifySourceFiles())
+                return ParResult.LogicError;
 
             // Attempt to verify all of the source files
             if (!setids[setid].VerifySourceFiles())

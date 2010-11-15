@@ -5,6 +5,7 @@ using System.Text;
 using System.IO;
 using System.Security.Cryptography;
 using Par2NET.Packets;
+using System.Diagnostics;
 
 namespace Par2NET
 {
@@ -15,6 +16,43 @@ namespace Par2NET
             using (BinaryReader br = new BinaryReader(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read, 16384)))
             {
                 return MD5.Create().ComputeHash(br.ReadBytes(16384));
+            }
+        }
+
+        private static byte[] MD5Hash(string filename)
+        {
+            using (BinaryReader br = new BinaryReader(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read)))
+            {
+                return MD5.Create().ComputeHash(br.BaseStream);
+            }
+        }
+
+        public static bool QuickCheckFile(string filename, int blocksize, out long filesize, out uint nb_blocks, out byte[] md5hash16k, out byte[] md5hash)
+        {
+            filesize = 0;
+            nb_blocks = 0;
+            md5hash = null;
+            md5hash16k = null;
+
+            try
+            {
+                FileInfo fiFile = new FileInfo(filename);
+
+                if (!fiFile.Exists)
+                    return false;
+
+                filesize = fiFile.Length;
+                nb_blocks = blocksize > 0 ? (filesize % blocksize == 0 ? (uint)(filesize / blocksize) : (uint)(filesize / blocksize + 1)) : 0;
+                md5hash = MD5Hash(filename);
+                md5hash16k = MD5Hash16k(filename);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+
+                return false;
             }
         }
 
@@ -30,13 +68,13 @@ namespace Par2NET
 
                 while (br.BaseStream.Position < br.BaseStream.Length)
                 {
-                    int toRead = Math.Min((2*blocksize), (int)(br.BaseStream.Length - br.BaseStream.Position));
+                    int nbRead = Math.Min((2*blocksize), (int)(br.BaseStream.Length - br.BaseStream.Position));
 
                     // Prepare sliding & working buffer
-                    byte[] buffer = br.ReadBytes(toRead);
+                    byte[] buffer = br.ReadBytes(nbRead);
                     byte[] workingBuffer = new byte[blocksize];
                     int offset = 0;
-                    Buffer.BlockCopy(buffer, offset, workingBuffer, 0, blocksize);
+                    Buffer.BlockCopy(buffer, offset, workingBuffer, 0, Math.Min(blocksize,nbRead));
 
                     do
                     {
@@ -57,25 +95,49 @@ namespace Par2NET
                         if (entry != null)
                         {
                             // We find a match, so go to next block !
-                            offset = blocksize;
+                            Console.WriteLine("block found at offset {0}, crc {1}", ((br.BaseStream.Position - nbRead) + offset), entry.crc);
                             //TODO : record the block found at (br.BaseStream.Position - toRead) + offset
+
+                            offset += blocksize;
                         }
                         else
                         {
-                            // We didn't find a match, maybe file is corrupted, so let's slide one byte and check again
-                            ++offset;
-                            Buffer.BlockCopy(buffer, offset, workingBuffer, 0, blocksize);
-
-                            // Way too long for now, so until speed in calculations, we stop after a 10k slide
-                            if (offset == 10240)
-                                offset = blocksize;
+                            if (br.BaseStream.Position == br.BaseStream.Length)
+                                break;
+                            else
+                                ++offset;
                         }
-                    } while (offset < blocksize); // Stop condition : When index is equal to blocksize, end of sliding buffer is reached, so we have to read from file
+
+
+                        if (offset >= 2 * blocksize)
+                            break;
+
+                        //1st part : what is already available in the buffer
+                        workingBuffer = new byte[blocksize];
+                        Buffer.BlockCopy(buffer, offset, workingBuffer, 0, nbRead - offset);
+
+                        //2nd part : if buffer.Length - offset < blocksize, then we will read from file if possible
+                        if (buffer.Length - offset < blocksize && br.BaseStream.Length - br.BaseStream.Position > blocksize) // at least one block available 
+                        {
+                            nbRead = Math.Min((2 * blocksize), (int)(br.BaseStream.Length - br.BaseStream.Position));
+                            int workingBufferIndex = buffer.Length - offset;
+                            buffer = br.ReadBytes(nbRead);
+                            offset = 0;
+                            Buffer.BlockCopy(buffer, offset, workingBuffer, workingBufferIndex, blocksize - workingBufferIndex);
+                        }
+
+                        // Way too long for now, so until speed in calculations, we stop after a 10k slide
+                        if (offset % blocksize == 1024)
+                            offset = 2 * blocksize;
+
+                    } while (offset < 2*blocksize); // Stop condition : When index is equal to blocksize, end of sliding buffer is reached, so we have to read from file
                 }
             }
+
+            //TODO : search for nb_blocks, 16k-md5, full-md5 and filesize in the list of available files
         }
 
-        public static void CheckFile_orig(string filename, int blocksize, List<FileVerificationEntry> fileids, byte[] md5hash16k, byte[] md5hash)
+        private static void CheckFile_orig(string filename, int blocksize, List<FileVerificationEntry> fileids, byte[] md5hash16k, byte[] md5hash)
         {
             byte[] targetMd5hash = new byte[16];
             byte[] targetMd5hash16k = MD5Hash16k(filename);

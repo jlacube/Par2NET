@@ -199,6 +199,41 @@ namespace Par2NET
             }
         }
 
+        internal bool QuickVerifySourceFiles()
+        {
+            try
+            {
+                bool result = true;
+
+                foreach (FileVerification fileVer in SourceFiles)
+                {
+                    if (!File.Exists(fileVer.TargetFileName))
+                        continue;
+
+                    result &= (QuickVerifyFile(fileVer) != null);
+
+                }
+
+                return result;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private bool? QuickVerifyFile(Par2NET.FileVerification fileVer)
+        {
+            long filesize = 0;
+            uint nb_blocks = 0;
+            byte[] md5hash = null;
+            byte[] md5hash16k = null;
+
+            FileChecker.QuickCheckFile(fileVer.TargetFileName, (int)this.MainPacket.blocksize, out filesize, out nb_blocks, out md5hash16k, out md5hash);
+
+            return false;
+        }
+
         private bool? VerifyFile(Par2NET.FileVerification fileVer)
         {
             FileChecker.CheckFile(fileVer.TargetFileName, (int)this.MainPacket.blocksize, fileVer.FileVerificationPacket.entries, fileVer.FileDescriptionPacket.hash16k, fileVer.FileDescriptionPacket.hashfull);
