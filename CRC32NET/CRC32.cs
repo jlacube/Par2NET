@@ -26,7 +26,7 @@ using System.Globalization;
 
 namespace CRC32NET
 {
-    public class CRC32 : HashAlgorithm
+    unsafe public class CRC32 : HashAlgorithm
     {
         public const uint DefaultSeed = 0xffffffff;
 
@@ -98,9 +98,34 @@ namespace CRC32NET
 
             unchecked
             {
-                while (--length >= 0)
+                unsafe
                 {
-                    crcValue = CrcTable[(crcValue ^ buffer[start++]) & 0xFF] ^ (crcValue >> 8);
+                    fixed (byte* pBuffer = buffer)
+                    {
+                        fixed (uint* pCrcTable = CrcTable)
+                        {
+                            while (--length >= 0)
+                            {
+                                //crcValue = CrcTable[(crcValue ^ buffer[start++]) & 0xFF] ^ (crcValue >> 8);
+
+
+                                crcValue = *(pCrcTable + ((crcValue ^ *(pBuffer + (start++))) & 0xFF)) ^ (crcValue >> 8);
+
+
+                                //uint index = buffer[start++];
+
+                                //index ^= crcValue;
+
+                                //index &= 0xFF;
+
+                                //crcValue = (crcValue >> 8);
+
+                                //uint xor = CrcTable[index];
+
+                                //crcValue ^= xor;
+                            }
+                        }
+                    }
                 }
             }
 

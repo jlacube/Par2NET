@@ -65,6 +65,7 @@ namespace Par2NET
             {
                 CRC32NET.CRC32 crc32Hasher = new CRC32NET.CRC32();
                 MD5 md5Hasher = MD5.Create();
+                FastCRC32.FastCRC32 crc32 = new FastCRC32.FastCRC32((ulong)blocksize);
 
                 while (br.BaseStream.Position < br.BaseStream.Length)
                 {
@@ -76,17 +77,31 @@ namespace Par2NET
                     int offset = 0;
                     Buffer.BlockCopy(buffer, offset, workingBuffer, 0, Math.Min(blocksize,nbRead));
 
+                    bool stepping = false;
+
                     do
                     {
                         // Compute crc32 & md5 hash for current slice
-                        crc32Hasher.ComputeHash(workingBuffer);
-                        uint crc32Value = crc32Hasher.CrcValue;
-                        byte[] md5Value = md5Hasher.ComputeHash(workingBuffer);
+                        //crc32Hasher.ComputeHash(workingBuffer);
+                        //uint crc32Value = crc32Hasher.CrcValue;
+
+                        uint crc32Value = 0;
+                        
+                        if (!stepping)
+                            crc32Value = crc32.CRCUpdateBlock(0xFFFFFFFF, (uint)blocksize, workingBuffer) ^ 0xFFFFFFFF;
+                        else
+
+
+                        stepping = false;
+
+                        //byte[] md5Value = md5Hasher.ComputeHash(workingBuffer);
 
                         // Do we have a match in the FileVerificationEntry
                         FileVerificationEntry entry = fileVerEntry.Find((FileVerificationEntry item) =>
                         {
-                            if (item.crc == crc32Value && ToolKit.ToHex(item.hash) == ToolKit.ToHex(md5Value))
+                            if (item.crc == crc32Value)
+                            //if (item.crc == crc32Value && ToolKit.ToHex(item.hash) == ToolKit.ToHex(md5Value))
+                            //if (ToolKit.ToHex(item.hash) == ToolKit.ToHex(md5Value))
                                 return true;
 
                             return false;
@@ -105,7 +120,10 @@ namespace Par2NET
                             if (br.BaseStream.Position == br.BaseStream.Length)
                                 break;
                             else
+                            {
                                 ++offset;
+                                stepping = true;
+                            }
                         }
 
 
@@ -114,7 +132,7 @@ namespace Par2NET
 
                         //1st part : what is already available in the buffer
                         workingBuffer = new byte[blocksize];
-                        Buffer.BlockCopy(buffer, offset, workingBuffer, 0, nbRead - offset);
+                        Buffer.BlockCopy(buffer, offset, workingBuffer, 0, (nbRead - offset) % blocksize);
 
                         //2nd part : if buffer.Length - offset < blocksize, then we will read from file if possible
                         if (buffer.Length - offset < blocksize && br.BaseStream.Length - br.BaseStream.Position > blocksize) // at least one block available 
@@ -127,8 +145,8 @@ namespace Par2NET
                         }
 
                         // Way too long for now, so until speed in calculations, we stop after a 10k slide
-                        if (offset % blocksize == 1024)
-                            offset = 2 * blocksize;
+                        //if (offset % blocksize == 1024)
+                        //    offset = 2 * blocksize;
 
                     } while (offset < 2*blocksize); // Stop condition : When index is equal to blocksize, end of sliding buffer is reached, so we have to read from file
                 }

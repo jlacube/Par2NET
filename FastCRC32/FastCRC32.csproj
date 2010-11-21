@@ -5,34 +5,30 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{E05C1D72-80B5-4B77-829D-CCE04D545F65}</ProjectGuid>
+    <ProjectGuid>{B9397654-166D-4D5C-AF78-43CEF6F6A906}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Par2NET</RootNamespace>
-    <AssemblyName>Par2NET</AssemblyName>
+    <RootNamespace>FastCRC32</RootNamespace>
+    <AssemblyName>FastCRC32</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <TargetFrameworkProfile>
-    </TargetFrameworkProfile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG</DefineConstants>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>DEBUG</DefineConstants>
+    <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -44,42 +40,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BinaryStreamReader.cs" />
-    <Compile Include="FileChecker.cs" />
-    <Compile Include="Interfaces\IParLibrary.cs" />
-    <Compile Include="Packets\CreatorPacket.cs" />
-    <Compile Include="Packets\DataBlock.cs" />
-    <Compile Include="Packets\FileDescriptionPacket.cs" />
-    <Compile Include="Packets\FileVerificationPacket.cs" />
-    <Compile Include="Packets\IPar2Packet.cs" />
-    <Compile Include="Packets\MainPacket.cs" />
-    <Compile Include="Packets\RecoveryPacket.cs" />
-    <Compile Include="Par1Library.cs" />
-    <Compile Include="Par2File.cs" />
-    <Compile Include="Par2FileReader.cs" />
-    <Compile Include="Par2RecoveryCollection.cs" />
-    <Compile Include="Par2RecoverySet.cs" />
-    <Compile Include="TasksHelper\CRC32TasksHelper.cs" />
-    <Compile Include="Par2Library.cs" />
+    <Compile Include="FastCRC32.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="TasksHelper\MD5TasksHelper.cs" />
-    <Compile Include="TasksHelper\ToolkitTasksHelper.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\CRC32NET\CRC32NET.csproj">
-      <Project>{2A96AA60-7D5B-49CC-B1A5-C3D8E4975A29}</Project>
-      <Name>CRC32NET</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\FastCRC32\FastCRC32.csproj">
-      <Project>{B9397654-166D-4D5C-AF78-43CEF6F6A906}</Project>
-      <Name>FastCRC32</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Tests\EntLib50.chm" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="CRCs_Hashs.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
