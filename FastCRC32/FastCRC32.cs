@@ -86,17 +86,13 @@ namespace FastCRC32
             }
         }
 
-        public uint CRCUpdateBlock(uint crc, uint length, byte[] buffer)
+        public uint CRCUpdateBlock(uint crc, uint length, byte[] buffer, uint start)
         {
             unchecked
             {
-
-                uint start = 0;
-
                 while (length-- > 0)
                 {
                     crc = crcTable[(crc ^ buffer[start++]) & 0xFF] ^ (crc >> 8);
-                    //crc = ((crc >> 8) & 0x00ffffff) ^ crcTable[(byte)(crc ^ buffer[start++])];
                 }
 
                 return crc;
@@ -119,7 +115,7 @@ namespace FastCRC32
         // Slide the CRC along a buffer by one character (removing the old and adding the new).
         // The new character is added using the main CCITT CRC32 table, and the old character
         // is removed using the windowtable.
-        public uint CRCSlideChar(uint crc, char chNew, char chOld)
+        public uint CRCSlideChar(uint crc, byte chNew, byte chOld)
         {
             unchecked
             {
