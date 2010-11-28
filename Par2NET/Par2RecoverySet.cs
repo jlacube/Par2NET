@@ -8,13 +8,6 @@ using System.IO;
 
 namespace Par2NET
 {
-    public class FileVerification
-    {
-        public FileDescriptionPacket FileDescriptionPacket = null;
-        public FileVerificationPacket FileVerificationPacket = null;
-        public string TargetFileName = string.Empty;
-    }
-
     public class Par2RecoverySet
     {
         public CreatorPacket CreatorPacket = null;
@@ -22,6 +15,11 @@ namespace Par2NET
         public List<RecoveryPacket> RecoveryPackets = new List<RecoveryPacket>();
         public Dictionary<string, FileVerification> FileSets = new Dictionary<string, FileVerification>();
         public List<FileVerification> SourceFiles = new List<FileVerification>();
+
+        private Dictionary<ulong, DataBlock> sourceblocks = new Dictionary<ulong, DataBlock>();
+        private Dictionary<ulong, DataBlock> targetblocks = new Dictionary<ulong, DataBlock>();
+
+
 
         private FileVerification FileVerification(string fileid)
         {
@@ -132,8 +130,8 @@ namespace Par2NET
             if (sourceblockcount <= 0)
                 return true;
 
-            Dictionary<ulong, DataBlock> sourceblocks = new Dictionary<ulong, DataBlock>();
-            Dictionary<ulong, DataBlock> targetblocks = new Dictionary<ulong, DataBlock>();
+            sourceblocks = new Dictionary<ulong, DataBlock>();
+            targetblocks = new Dictionary<ulong, DataBlock>();
 
             for (ulong index = 0; index < sourceblockcount; index++)
             {
@@ -156,7 +154,7 @@ namespace Par2NET
                     for (ulong i = 0; i < blockcount; i++)
                     {
                         DataBlock dataBlock = sourceblocks[blocknumber];
-                        dataBlock.Offset = 0;
+                        dataBlock.Offset = i * MainPacket.blocksize;
                         dataBlock.Length = Math.Min(MainPacket.blocksize, filesize - (i * MainPacket.blocksize));
                         blocknumber++;
                     }
@@ -239,6 +237,46 @@ namespace Par2NET
             FileChecker.CheckFile(fileVer.TargetFileName, (int)this.MainPacket.blocksize, fileVer.FileVerificationPacket.entries, fileVer.FileDescriptionPacket.hash16k, fileVer.FileDescriptionPacket.hashfull);
 
             return false;
+        }
+
+        // Rename any damaged or missnamed target files.
+        public bool RenameTargetFiles()
+        {
+            // Rename any damaged target files
+            foreach (FileVerification fileVer in SourceFiles)
+            {
+                // If the target file exists but is not a complete version of the file
+                if (fileVer.GetTargetExists() && fileVer.GetTargetFile() != fileVer.GetCompleteFile())
+                {
+                    if (!fileVer.GetTargetFile().Rename())
+                        return false;
+
+                    // We no longer have a target file
+                    fileVer.SetTargetExists(false);
+                    fileVer.SetTargetFile(null);
+                }
+            }
+
+            // Rename any missnamed but complete versions of the files
+            foreach (FileVerification fileVer in SourceFiles)
+            {
+                // If there is no targetfile and there is a complete version
+                if (fileVer.GetTargetFile() == null && fileVer.GetCompleteFile() != null)
+                {
+                    if (!fileVer.GetCompleteFile().Rename(fileVer.TargetFileName))
+                        return false;
+
+                    // This file is now the target file
+                    fileVer.SetTargetExists(true);
+                    fileVer.SetTargetFile(fileVer.GetCompleteFile());
+
+                    // We have one more complete file
+                    //TODO : add member to class
+                    //completefilecount++;
+                }
+            }
+
+            return true;
         }
     }
 }

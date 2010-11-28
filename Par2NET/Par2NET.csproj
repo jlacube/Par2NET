@@ -45,7 +45,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BinaryStreamReader.cs" />
+    <Compile Include="DiskFile.cs" />
     <Compile Include="FileChecker.cs" />
+    <Compile Include="FileVerification.cs" />
     <Compile Include="Interfaces\IParLibrary.cs" />
     <Compile Include="Packets\CreatorPacket.cs" />
     <Compile Include="Packets\DataBlock.cs" />
