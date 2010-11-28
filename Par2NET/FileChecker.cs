@@ -56,93 +56,6 @@ namespace Par2NET
             }
         }
 
-        public static void CheckFile_bad(string filename, int blocksize, List<FileVerificationEntry> fileVerEntry, byte[] md5hash16k, byte[] md5hash)
-        {
-            using (BinaryReader br = new BinaryReader(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read, 2 * blocksize)))
-            {
-                FastCRC32.FastCRC32 crc32 = new FastCRC32.FastCRC32((ulong)blocksize);
-
-                while (br.BaseStream.Position < br.BaseStream.Length)
-                {
-                    int nbRead = Math.Min((2 * blocksize), (int)(br.BaseStream.Length - br.BaseStream.Position));
-
-                    byte[] buffer = br.ReadBytes(nbRead);
-                    int offset = 0;
-
-                    bool stepping = false;
-
-                    byte inch = 0;
-                    byte outch = 0;
-
-                    uint crc32Value = 0;
-
-
-                    do
-                    {
-                        if (!stepping)
-                        {
-                            crc32Value = crc32.CRCUpdateBlock(0xFFFFFFFF, (uint)blocksize, buffer, (uint)offset) ^ 0xFFFFFFFF;
-                        }
-                        else
-                        {
-                            crc32Value = crc32.windowMask ^ crc32.CRCSlideChar(crc32.windowMask ^ crc32Value, inch, outch);
-                        }
-
-                        // Do we have a match in the FileVerificationEntry
-                        FileVerificationEntry entry = fileVerEntry.Find((FileVerificationEntry item) =>
-                        {
-                            if (item.crc == crc32Value)
-                                //if (item.crc == crc32Value && ToolKit.ToHex(item.hash) == ToolKit.ToHex(md5Value))
-                                //if (ToolKit.ToHex(item.hash) == ToolKit.ToHex(md5Value))
-                                return true;
-
-                            return false;
-                        });
-
-                        if (entry != null)
-                        {
-                            // We find a match, so go to next block !
-                            Console.WriteLine("block found at offset {0}, crc {1}", ((br.BaseStream.Position - nbRead) + offset), entry.crc);
-                            //TODO : record the block found at (br.BaseStream.Position - toRead) + offset
-
-                            offset += blocksize;
-                        }
-                        else
-                        {
-                            if (br.BaseStream.Position == br.BaseStream.Length)
-                                break;
-                            else
-                            {
-                                outch = buffer[offset];
-                                ++offset;
-                                stepping = true;
-                            }
-                        }
-
-                        if (offset >= 2 * blocksize)
-                            break;
-
-                        if (offset >= blocksize)
-                        {
-                            byte[] newBuffer = new byte[buffer.Length];
-                            Buffer.BlockCopy(buffer, offset, newBuffer, 0, 2 * blocksize - offset);
-
-                            byte[] readBytes = br.ReadBytes(Math.Min(offset, (int)(br.BaseStream.Length - br.BaseStream.Position)));
-
-                            Buffer.BlockCopy(readBytes, 0, newBuffer, 2 * blocksize - offset, readBytes.Length);
-
-                            offset = 0;
-
-                            buffer = newBuffer;
-                        }
-
-
-                    } while (offset < 2 * blocksize); // Stop condition : When index is equal to blocksize, end of sliding buffer is reached, so we have to read from file
-                }
-            }
-        }
-
-
         public static void CheckFile(string filename, int blocksize, List<FileVerificationEntry> fileVerEntry, byte[] md5hash16k, byte[] md5hash)
         {
             //TODO : Maybe rewrite in TPL for slide calculation
@@ -158,11 +71,9 @@ namespace Par2NET
                 {
                     int nbRead = Math.Min((2*blocksize), (int)(br.BaseStream.Length - br.BaseStream.Position));
 
-                    // Prepare sliding & working buffer
+                    // Prepare buffer
                     byte[] buffer = br.ReadBytes(nbRead);
-                    //byte[] workingBuffer = new byte[blocksize];
                     int offset = 0;
-                    //Buffer.BlockCopy(buffer, offset, workingBuffer, 0, Math.Min(blocksize,nbRead));
 
                     bool stepping = false;
 
@@ -173,9 +84,7 @@ namespace Par2NET
 
                     do
                     {
-                        // Compute crc32 & md5 hash for current slice
-                        //crc32Hasher.ComputeHash(workingBuffer);
-                        //uint crc32Value = crc32Hasher.CrcValue;
+                        // Compute crc32 for current slice
 
                         if (!stepping)
                         {
@@ -183,10 +92,6 @@ namespace Par2NET
                         }
                         else
                         {
-                            // checksum = windowmask ^ CRCSlideChar(windowmask ^ checksum, inch, outch, windowtable);
-
-                            //inch = workingBuffer[blocksize - 1];
-
                             inch = buffer[offset + blocksize - 1];
 
                             crc32Value = crc32.windowMask ^ crc32.CRCSlideChar(crc32.windowMask ^ crc32Value, inch, outch);
@@ -194,24 +99,26 @@ namespace Par2NET
 
                         stepping = false;
 
-                        //byte[] md5Value = md5Hasher.ComputeHash(workingBuffer);
-
                         // Do we have a match in the FileVerificationEntry
                         FileVerificationEntry entry = fileVerEntry.Find((FileVerificationEntry item) =>
                         {
                             if (item.crc == crc32Value)
-                            //if (item.crc == crc32Value && ToolKit.ToHex(item.hash) == ToolKit.ToHex(md5Value))
-                            //if (ToolKit.ToHex(item.hash) == ToolKit.ToHex(md5Value))
-                                return true;
+                            {
+                                // We find a CRC32 match, let's check the MD5 hash now
+                                byte[] md5Value = md5Hasher.ComputeHash(buffer, offset, blocksize);
+
+                                return ToolKit.ToHex(item.hash) == ToolKit.ToHex(md5Value);
+                            }
 
                             return false;
                         });
 
                         if (entry != null)
                         {
-                            // We find a match, so go to next block !
+                            // We found a complete match, so go to next block !
+
+                            //TODO : correct offset counter for last block
                             Console.WriteLine("block found at offset {0}, crc {1}", (br.BaseStream.Position - nbRead + offset), entry.crc);
-                            //TODO : record the block found at (br.BaseStream.Position - toRead) + offset
 
                             offset += blocksize;
                         }
@@ -224,7 +131,6 @@ namespace Par2NET
                                 outch = buffer[offset];
                                 ++offset;
                                 stepping = true;
-                                //outch = workingBuffer[0];
                             }
                         }
 
@@ -243,182 +149,11 @@ namespace Par2NET
 
                             offset = 0;
 
-                            //nbRead = 0;
-
                             buffer = newBuffer;
                         }
 
-                        ////1st part : what is already available in the buffer
-                        //workingBuffer = new byte[blocksize];
-                        //Buffer.BlockCopy(buffer, offset, workingBuffer, 0, (nbRead - offset) % blocksize);
-
-                        ////2nd part : if buffer.Length - offset < blocksize, then we will read from file if possible
-                        //if (buffer.Length - offset < blocksize && br.BaseStream.Length - br.BaseStream.Position > blocksize) // at least one block available
-                        //{
-                        //    nbRead = Math.Min((2 * blocksize), (int)(br.BaseStream.Length - br.BaseStream.Position));
-                        //    int workingBufferIndex = buffer.Length - offset;
-                        //    buffer = br.ReadBytes(nbRead);
-                        //    offset = 0;
-                        //    Buffer.BlockCopy(buffer, offset, workingBuffer, workingBufferIndex, blocksize - workingBufferIndex);
-                        //}
-
-                        // Way too long for now, so until speed in calculations, we stop after a 10k slide
-                        //if (offset % blocksize == 1024)
-                        // offset = 2 * blocksize;
-
                     } while (offset < 2*blocksize); // Stop condition : When index is equal to blocksize, end of sliding buffer is reached, so we have to read from file
                 }
-            }
-
-            //TODO : search for nb_blocks, 16k-md5, full-md5 and filesize in the list of available files
-        }
-
-        public static void CheckFile_previous(string filename, int blocksize, List<FileVerificationEntry> fileVerEntry, byte[] md5hash16k, byte[] md5hash)
-        {
-            //TODO : Maybe rewrite in TPL for slide calculation
-            //TODO : Maybe search against all sourcefiles (case of misnamed files)
-
-            using (BinaryReader br = new BinaryReader(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read, 2 * blocksize)))
-            {
-                CRC32NET.CRC32 crc32Hasher = new CRC32NET.CRC32();
-                MD5 md5Hasher = MD5.Create();
-                FastCRC32.FastCRC32 crc32 = new FastCRC32.FastCRC32((ulong)blocksize);
-
-                while (br.BaseStream.Position < br.BaseStream.Length)
-                {
-                    int nbRead = Math.Min((2 * blocksize), (int)(br.BaseStream.Length - br.BaseStream.Position));
-
-                    // Prepare sliding & working buffer
-                    byte[] buffer = br.ReadBytes(nbRead);
-                    byte[] workingBuffer = new byte[blocksize];
-                    int offset = 0;
-                    Buffer.BlockCopy(buffer, offset, workingBuffer, 0, Math.Min(blocksize, nbRead));
-
-                    bool stepping = false;
-
-                    byte inch = 0;
-                    byte outch = 0;
-
-                    uint crc32Value = 0;
-
-                    do
-                    {
-                        // Compute crc32 & md5 hash for current slice
-                        //crc32Hasher.ComputeHash(workingBuffer);
-                        //uint crc32Value = crc32Hasher.CrcValue;
-
-                        if (!stepping)
-                            crc32Value = crc32.CRCUpdateBlock(0xFFFFFFFF, (uint)blocksize, workingBuffer, 0) ^ 0xFFFFFFFF;
-                        else
-                        {
-                            // checksum = windowmask ^ CRCSlideChar(windowmask ^ checksum, inch, outch, windowtable);
-
-                            inch = workingBuffer[blocksize - 1];
-
-                            crc32Value = crc32.windowMask ^ crc32.CRCSlideChar(crc32.windowMask ^ crc32Value, inch, outch);
-                        }
-
-                        stepping = false;
-
-                        //byte[] md5Value = md5Hasher.ComputeHash(workingBuffer);
-
-                        // Do we have a match in the FileVerificationEntry
-                        FileVerificationEntry entry = fileVerEntry.Find((FileVerificationEntry item) =>
-                        {
-                            if (item.crc == crc32Value)
-                                //if (item.crc == crc32Value && ToolKit.ToHex(item.hash) == ToolKit.ToHex(md5Value))
-                                //if (ToolKit.ToHex(item.hash) == ToolKit.ToHex(md5Value))
-                                return true;
-
-                            return false;
-                        });
-
-                        if (entry != null)
-                        {
-                            // We find a match, so go to next block !
-                            Console.WriteLine("block found at offset {0}, crc {1}", ((br.BaseStream.Position - nbRead) + offset), entry.crc);
-                            //TODO : record the block found at (br.BaseStream.Position - toRead) + offset
-
-                            offset += blocksize;
-                        }
-                        else
-                        {
-                            if (br.BaseStream.Position == br.BaseStream.Length)
-                                break;
-                            else
-                            {
-                                ++offset;
-                                stepping = true;
-                                outch = workingBuffer[0];
-                            }
-                        }
-
-
-                        if (offset >= 2 * blocksize)
-                            break;
-
-                        //1st part : what is already available in the buffer
-                        workingBuffer = new byte[blocksize];
-                        Buffer.BlockCopy(buffer, offset, workingBuffer, 0, (nbRead - offset) % blocksize);
-
-                        //2nd part : if buffer.Length - offset < blocksize, then we will read from file if possible
-                        if (buffer.Length - offset < blocksize && br.BaseStream.Length - br.BaseStream.Position > blocksize) // at least one block available
-                        {
-                            nbRead = Math.Min((2 * blocksize), (int)(br.BaseStream.Length - br.BaseStream.Position));
-                            int workingBufferIndex = buffer.Length - offset;
-                            buffer = br.ReadBytes(nbRead);
-                            offset = 0;
-                            Buffer.BlockCopy(buffer, offset, workingBuffer, workingBufferIndex, blocksize - workingBufferIndex);
-                        }
-
-                        // Way too long for now, so until speed in calculations, we stop after a 10k slide
-                        //if (offset % blocksize == 1024)
-                        // offset = 2 * blocksize;
-
-                    } while (offset < 2 * blocksize); // Stop condition : When index is equal to blocksize, end of sliding buffer is reached, so we have to read from file
-                }
-            }
-
-            //TODO : search for nb_blocks, 16k-md5, full-md5 and filesize in the list of available files
-        }
-
-        private static void CheckFile_orig(string filename, int blocksize, List<FileVerificationEntry> fileids, byte[] md5hash16k, byte[] md5hash)
-        {
-            byte[] targetMd5hash = new byte[16];
-            byte[] targetMd5hash16k = MD5Hash16k(filename);
-
-            int buffer_size = blocksize;
-
-            CRC32NET.CRC32 crc32 = new CRC32NET.CRC32();
-            MD5 md5Hasher = MD5.Create();
-            MD5 md5FullHasher = MD5.Create();
-
-            using (BinaryReader br = new BinaryReader(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read, buffer_size)))
-            {
-                long stop = br.BaseStream.Length - buffer_size;
-
-                while (br.BaseStream.Position < stop)
-                {
-                    byte[] bytes = br.ReadBytes(buffer_size);
-                    byte[] fullbytes = (byte[])bytes.Clone();
-                    crc32.ComputeHash(bytes);
-                    uint crc = crc32.CrcValue;
-                    byte[] md5 = md5Hasher.ComputeHash(bytes);
-                    md5FullHasher.TransformBlock(fullbytes, 0, fullbytes.Length, fullbytes, 0);
-                    //Console.WriteLine("crc:{0},md5:{1}", crc, ToolKit.ToHex(md5));
-                }
-
-                byte[] tmpbytes = br.ReadBytes((int)(br.BaseStream.Length - br.BaseStream.Position));
-                byte[] finalbytes = new byte[buffer_size];
-                Buffer.BlockCopy(tmpbytes, 0, finalbytes, 0, tmpbytes.Length);
-                byte[] finalfullbytes = (byte[])finalbytes.Clone();
-                crc32.ComputeHash(finalbytes);
-                uint crcfinal = crc32.CrcValue;
-                byte[] md5final = md5Hasher.ComputeHash(finalbytes);
-                md5FullHasher.TransformFinalBlock(finalfullbytes, 0, finalfullbytes.Length);
-                md5hash = md5FullHasher.Hash;
-
-                //Console.WriteLine("crc:{0},md5:{1}", crcfinal, ToolKit.ToHex(md5final));
             }
         }
     }

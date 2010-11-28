@@ -295,6 +295,8 @@ namespace Par2NET
 
         private ParResult Verify(ref List<string> inputFiles, ref List<string> recoveryFiles)
         {
+            FastGaloisFields.GaloisTables.GaloisTable16 GT16 = new FastGaloisFields.GaloisTables.GaloisTable16(16, 0x1100B);
+
             try
             {
                 foreach (string recoveryFile in recoveryFiles)

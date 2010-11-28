@@ -74,6 +74,10 @@
       <Project>{B9397654-166D-4D5C-AF78-43CEF6F6A906}</Project>
       <Name>FastCRC32</Name>
     </ProjectReference>
+    <ProjectReference Include="..\FastGaloisFields\FastGaloisFields\FastGaloisFields.csproj">
+      <Project>{2D8D74BA-12FD-47BE-A84F-D9BE25D60AB5}</Project>
+      <Name>FastGaloisFields %28FastGaloisFields\FastGaloisFields%29</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="Tests\EntLib50.chm" />
