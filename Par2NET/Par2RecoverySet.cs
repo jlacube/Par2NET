@@ -16,10 +16,8 @@ namespace Par2NET
         public Dictionary<string, FileVerification> FileSets = new Dictionary<string, FileVerification>();
         public List<FileVerification> SourceFiles = new List<FileVerification>();
 
-        private Dictionary<ulong, DataBlock> sourceblocks = new Dictionary<ulong, DataBlock>();
-        private Dictionary<ulong, DataBlock> targetblocks = new Dictionary<ulong, DataBlock>();
-
-
+        //private Dictionary<ulong, DataBlock> sourceblocks = new Dictionary<ulong, DataBlock>();
+        //private Dictionary<ulong, DataBlock> targetblocks = new Dictionary<ulong, DataBlock>();
 
         private FileVerification FileVerification(string fileid)
         {
@@ -130,22 +128,24 @@ namespace Par2NET
             if (sourceblockcount <= 0)
                 return true;
 
-            sourceblocks = new Dictionary<ulong, DataBlock>();
-            targetblocks = new Dictionary<ulong, DataBlock>();
+            //sourceblocks = new Dictionary<ulong, DataBlock>();
+            //targetblocks = new Dictionary<ulong, DataBlock>();
 
-            for (ulong index = 0; index < sourceblockcount; index++)
-            {
-                sourceblocks.Add(index, new DataBlock());
-                targetblocks.Add(index, new DataBlock());
-            }
+            //for (ulong index = 0; index < sourceblockcount; index++)
+            //{
+            //    sourceblocks.Add(index, new DataBlock());
+            //    targetblocks.Add(index, new DataBlock());
+            //}
 
             ulong totalsize = 0;
-            ulong blocknumber = 0;
+            //ulong blocknumber = 0;
 
             foreach (FileVerification fileVer in SourceFiles)
             {
                 totalsize += fileVer.FileDescriptionPacket.length;
                 ulong blockcount = fileVer.FileVerificationPacket.blockcount;
+                fileVer.SourceBlocks = new List<DataBlock>();
+                fileVer.TargetBlocks = new List<DataBlock>();
 
                 if (blockcount > 0)
                 {
@@ -153,10 +153,13 @@ namespace Par2NET
 
                     for (ulong i = 0; i < blockcount; i++)
                     {
-                        DataBlock dataBlock = sourceblocks[blocknumber];
+                        //DataBlock dataBlock = sourceblocks[blocknumber];
+                        DataBlock dataBlock = new DataBlock();
                         dataBlock.Offset = i * MainPacket.blocksize;
                         dataBlock.Length = Math.Min(MainPacket.blocksize, filesize - (i * MainPacket.blocksize));
-                        blocknumber++;
+                        fileVer.SourceBlocks.Add(dataBlock);
+                        fileVer.TargetBlocks.Add(new DataBlock());
+                        //blocknumber++;
                     }
                 }
             }
@@ -273,6 +276,52 @@ namespace Par2NET
                     // We have one more complete file
                     //TODO : add member to class
                     //completefilecount++;
+                }
+            }
+
+            return true;
+        }
+
+        public bool CreateTargetFiles()
+        {
+            uint filenumber = 0;
+
+            // Create any missing target files
+            foreach (FileVerification fileVer in SourceFiles)
+            {
+
+                // If the file does not exist
+                if (!fileVer.GetTargetExists())
+                {
+                    DiskFile targetfile = new DiskFile();
+                    string filename = fileVer.TargetFileName;
+                    ulong filesize = fileVer.FileDescriptionPacket.length;
+
+                    // Create the target file
+                    if (!targetfile.Create(filename, filesize))
+                    {
+                        return false;
+                    }
+
+                    // This file is now the target file
+                    fileVer.SetTargetExists(true);
+                    fileVer.SetTargetFile(targetfile);
+
+                    ulong offset = 0;
+
+                    // Allocate all of the target data blocks
+                    for (int index = 0; index < fileVer.TargetBlocks.Count; index++)
+                    {
+                        DataBlock tb = fileVer.TargetBlocks[index];
+                        tb.Offset = offset;
+                        tb.Length = Math.Min(MainPacket.blocksize, filesize - offset);
+
+                        offset += MainPacket.blocksize;
+                    }
+
+                    // Add the file to the list of those that will need to be verified
+                    // once the repair has completed.
+                    //verifylist.push_back(sourcefile);
                 }
             }
 

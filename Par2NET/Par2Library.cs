@@ -298,10 +298,10 @@ namespace Par2NET
       //// Are we still missing any files
       //if (completefilecount<mainpacket->RecoverableFileCount())
       //{
-      //  // Work out which files are being repaired, create them, and allocate
-      //  // target DataBlocks to them, and remember them for later verification.
-      //  if (!CreateTargetFiles())
-      //    return eFileIOError;
+            // Work out which files are being repaired, create them, and allocate
+            // target DataBlocks to them, and remember them for later verification.
+            if (!setids[setid].CreateTargetFiles())
+                return ParResult.FileIOError;
 
       //  // Work out which data blocks are available, which need to be copied
       //  // directly to the output, and which need to be recreated, and compute
