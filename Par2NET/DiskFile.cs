@@ -36,5 +36,20 @@ namespace Par2NET
         {
             throw new NotImplementedException();
         }
+
+        internal bool Open()
+        {
+            throw new NotImplementedException();
+        }
+
+        internal bool Read(ulong fileoffset, byte[] buffer, uint want)
+        {
+            throw new NotImplementedException();
+        }
+
+        internal bool Write(ulong fileoffset, byte[] buffer, uint have)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

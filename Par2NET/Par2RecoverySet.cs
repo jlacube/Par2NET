@@ -16,12 +16,17 @@ namespace Par2NET
         public Dictionary<string, FileVerification> FileSets = new Dictionary<string, FileVerification>();
         public List<FileVerification> SourceFiles = new List<FileVerification>();
 
-        public uint completefilecount = 0;
+        public uint completefilecount = 0;       // How many files are fully verified
+        public uint renamedfilecount = 0;        // How many files are verified but have the wrong name
+        public uint damagedfilecount = 0;        // How many files exist but are damaged
+        public uint missingfilecount = 0;        // How many files are completely missing
 
         public ulong chunksize = 0;              // How much of a block can be processed.
         public uint sourceblockcount = 0;        // The total number of blocks
         public uint availableblockcount = 0;     // How many undamaged blocks have been found
         public uint missingblockcount = 0;       // How many blocks are missing
+
+        public ulong totaldata = 0;              // Total amount of data to be processed.
 
         public byte[] inputbuffer = null;             // Buffer for reading DataBlocks (chunksize)
         public byte[] outputbuffer = null;            // Buffer for writing DataBlocks (chunksize * missingblockcount)
@@ -137,17 +142,7 @@ namespace Par2NET
             if (sourceblockcount <= 0)
                 return true;
 
-            //sourceblocks = new Dictionary<ulong, DataBlock>();
-            //targetblocks = new Dictionary<ulong, DataBlock>();
-
-            //for (ulong index = 0; index < sourceblockcount; index++)
-            //{
-            //    sourceblocks.Add(index, new DataBlock());
-            //    targetblocks.Add(index, new DataBlock());
-            //}
-
             ulong totalsize = 0;
-            //ulong blocknumber = 0;
 
             foreach (FileVerification fileVer in SourceFiles)
             {
@@ -162,28 +157,16 @@ namespace Par2NET
 
                     for (ulong i = 0; i < blockcount; i++)
                     {
-                        //DataBlock dataBlock = sourceblocks[blocknumber];
                         DataBlock dataBlock = new DataBlock();
-                        dataBlock.Offset = i * MainPacket.blocksize;
-                        dataBlock.Length = Math.Min(MainPacket.blocksize, filesize - (i * MainPacket.blocksize));
+                        dataBlock.offset = i * MainPacket.blocksize;
+                        dataBlock.length = Math.Min(MainPacket.blocksize, filesize - (i * MainPacket.blocksize));
                         fileVer.SourceBlocks.Add(dataBlock);
                         fileVer.TargetBlocks.Add(new DataBlock());
-                        //blocknumber++;
                     }
                 }
             }
 
             return true;
-        }
-
-        internal bool PrepareVerificationHashTable()
-        {
-            throw new NotImplementedException();
-        }
-
-        internal bool ComputeWindowTable()
-        {
-            throw new NotImplementedException();
         }
 
         internal bool VerifySourceFiles()
@@ -242,6 +225,11 @@ namespace Par2NET
             FileChecker.QuickCheckFile(fileVer.TargetFileName, (int)this.MainPacket.blocksize, out filesize, out nb_blocks, out md5hash16k, out md5hash);
 
             return false;
+        }
+
+        private bool VerifyDataFile(FileVerification fileVer)
+        {
+            return (bool)VerifyFile(fileVer);
         }
 
         private bool? VerifyFile(Par2NET.FileVerification fileVer)
@@ -321,8 +309,8 @@ namespace Par2NET
                     for (int index = 0; index < fileVer.TargetBlocks.Count; index++)
                     {
                         DataBlock tb = fileVer.TargetBlocks[index];
-                        tb.Offset = offset;
-                        tb.Length = Math.Min(MainPacket.blocksize, filesize - offset);
+                        tb.offset = offset;
+                        tb.length = Math.Min(MainPacket.blocksize, filesize - offset);
 
                         offset += MainPacket.blocksize;
                     }
@@ -360,11 +348,107 @@ namespace Par2NET
             }
         }
 
+        // Verify that all of the reconstructed target files are now correct.
+        // Do this in multiple threads if appropriate (1 thread per processor).
         internal bool VerifyTargetFiles()
         {
-            throw new NotImplementedException();
+            bool finalresult = true;
+
+            // Verify the target files in alphabetical order
+            verifylist.Sort();
+
+	        foreach( FileVerification fileVer in verifylist)
+            {
+                DiskFile targetfile = fileVer.GetTargetFile();
+
+                // Close the file
+                if (targetfile.IsOpen())
+                    targetfile.Close();
+
+                // Mark all data blocks for the file as unknown
+                foreach (DataBlock db in fileVer.SourceBlocks)
+                {
+                    db.ClearLocation();
+                }
+
+                // Say we don't have a complete version of the file
+                fileVer.SetCompleteFile(null);
+
+                // Re-open the target file
+                if (!targetfile.Open())
+                {
+                    finalresult &= false;
+                    continue;
+                }
+
+                // Verify the file again
+                //if (!VerifyDataFile(targetfile, fileVer))
+                if (!VerifyDataFile(fileVer))
+                    finalresult &= false;
+
+                // Close the file again
+                targetfile.Close();
+
+                // Find out how much data we have found
+                UpdateVerificationResults();
+            }
+
+            return finalresult;
         }
 
+        // Find out how much data we have found
+        private void UpdateVerificationResults()
+        {
+            availableblockcount = 0;
+            missingblockcount = 0;
+
+            completefilecount = 0;
+            renamedfilecount = 0;
+            damagedfilecount = 0;
+            missingfilecount = 0;
+
+            foreach (FileVerification sourcefile in SourceFiles)
+            {
+                // Was a perfect match for the file found
+                if (sourcefile.GetCompleteFile() != null)
+                {
+                    // Is it the target file or a different one
+                    if (sourcefile.GetCompleteFile() == sourcefile.GetTargetFile())
+                    {
+                        completefilecount++;
+                    }
+                    else
+                    {
+                        renamedfilecount++;
+                    }
+
+                    availableblockcount += (uint)sourcefile.FileVerificationPacket.blockcount;
+                }
+                else
+                {
+                    // Count the number of blocks that have been found
+                    foreach (DataBlock sb in sourcefile.SourceBlocks)
+                    {
+                        if (sb.IsSet())
+                            availableblockcount++;
+                    }
+
+                    // Does the target file exist
+                    if (sourcefile.GetTargetExists())
+                    {
+                        damagedfilecount++;
+                    }
+                    else
+                    {
+                        missingfilecount++;
+                    }
+                }
+            }
+
+            missingblockcount = sourceblockcount - availableblockcount;
+        }
+
+        // Allocate memory buffers for reading and writing data to disk.
         internal bool AllocateBuffers(ulong memoryLimit)
         {
             // Would single pass processing use too much memory
@@ -391,6 +475,11 @@ namespace Par2NET
             }
 
             return true;
+        }
+
+        internal bool ProcessData(ulong blockoffset, uint blocklength)
+        {
+            throw new NotImplementedException();
         }
     }
 }

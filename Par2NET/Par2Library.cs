@@ -254,29 +254,27 @@ namespace Par2NET
                     return ParResult.MemoryError;
                 }
 
-                //  // Set the total amount of data to be processed.
-                //  progress = 0;
-                //  this->previouslyReportedProgress = -10000000;	// Big negative
-                //  totaldata = blocksize * sourceblockcount * (missingblockcount > 0 ? missingblockcount : 1);
+                // Set the total amount of data to be processed.
+                setids[setid].totaldata = setids[setid].MainPacket.blocksize * setids[setid].sourceblockcount * (setids[setid].missingblockcount > 0 ? setids[setid].missingblockcount : 1);
 
-                //  // Start at an offset of 0 within a block.
-                //  u64 blockoffset = 0;
-                //  while (blockoffset < blocksize) // Continue until the end of the block.
-                //  {
-                //    // Work out how much data to process this time.
-                //    size_t blocklength = (size_t)min((u64)chunksize, blocksize-blockoffset);
+                // Start at an offset of 0 within a block.
+                ulong blockoffset = 0;
+                while (blockoffset < setids[setid].MainPacket.blocksize) // Continue until the end of the block.
+                {
+                    // Work out how much data to process this time.
+                    uint blocklength = (uint)Math.Min((ulong)setids[setid].chunksize, setids[setid].MainPacket.blocksize - blockoffset);
 
-                //    // Read source data, process it through the RS matrix and write it to disk.
-                //    if (!ProcessData(blockoffset, blocklength))
-                //    {
-                //      // Delete all of the partly reconstructed files
-                //      DeleteIncompleteTargetFiles();
-                //      return eFileIOError;
-                //    }
+                    // Read source data, process it through the RS matrix and write it to disk.
+                    if (!setids[setid].ProcessData(blockoffset, blocklength))
+                    {
+                        // Delete all of the partly reconstructed files
+                        setids[setid].DeleteIncompleteTargetFiles();
+                        return ParResult.FileIOError;
+                    }
 
-                //    // Advance to the need offset within each block
-                //    blockoffset += blocklength;
-                //  }
+                    // Advance to the need offset within each block
+                    blockoffset += blocklength;
+                }
 
                 //  if (noiselevel > CommandLine::nlSilent)
                 //    cout << endl << "Verifying repaired files:" << endl << endl;
