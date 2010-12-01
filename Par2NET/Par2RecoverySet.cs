@@ -16,8 +16,17 @@ namespace Par2NET
         public Dictionary<string, FileVerification> FileSets = new Dictionary<string, FileVerification>();
         public List<FileVerification> SourceFiles = new List<FileVerification>();
 
-        //private Dictionary<ulong, DataBlock> sourceblocks = new Dictionary<ulong, DataBlock>();
-        //private Dictionary<ulong, DataBlock> targetblocks = new Dictionary<ulong, DataBlock>();
+        public uint completefilecount = 0;
+
+        public ulong chunksize = 0;              // How much of a block can be processed.
+        public uint sourceblockcount = 0;        // The total number of blocks
+        public uint availableblockcount = 0;     // How many undamaged blocks have been found
+        public uint missingblockcount = 0;       // How many blocks are missing
+
+        public byte[] inputbuffer = null;             // Buffer for reading DataBlocks (chunksize)
+        public byte[] outputbuffer = null;            // Buffer for writing DataBlocks (chunksize * missingblockcount)
+
+        private List<FileVerification> verifylist = new List<FileVerification>();
 
         private FileVerification FileVerification(string fileid)
         {
@@ -274,8 +283,7 @@ namespace Par2NET
                     fileVer.SetTargetFile(fileVer.GetCompleteFile());
 
                     // We have one more complete file
-                    //TODO : add member to class
-                    //completefilecount++;
+                    completefilecount++;
                 }
             }
 
@@ -321,8 +329,65 @@ namespace Par2NET
 
                     // Add the file to the list of those that will need to be verified
                     // once the repair has completed.
-                    //verifylist.push_back(sourcefile);
+                    verifylist.Add(fileVer);
                 }
+            }
+
+            return true;
+        }
+
+        internal bool ComputeRSmatrix()
+        {
+            throw new NotImplementedException();
+        }
+
+        internal void DeleteIncompleteTargetFiles()
+        {
+            foreach (FileVerification fileVer in verifylist)
+            {
+                if (fileVer.GetTargetExists())
+                {
+                    DiskFile targetFile = fileVer.GetTargetFile();
+
+                    if (targetFile.IsOpen())
+                        targetFile.Close();
+
+                    targetFile.Delete();
+
+                    fileVer.SetTargetExists(false);
+                    fileVer.SetTargetFile(null);
+                }
+            }
+        }
+
+        internal bool VerifyTargetFiles()
+        {
+            throw new NotImplementedException();
+        }
+
+        internal bool AllocateBuffers(ulong memoryLimit)
+        {
+            // Would single pass processing use too much memory
+            if (MainPacket.blocksize * missingblockcount > memoryLimit)
+            {
+                // Pick a size that is small enough
+                chunksize = (ulong) (~3 & (int)(memoryLimit / missingblockcount));
+            }
+            else
+            {
+                chunksize = MainPacket.blocksize;
+            }
+
+            try
+            {
+                // Allocate the two buffers
+                inputbuffer = new byte[chunksize];
+                outputbuffer = new byte[chunksize * missingblockcount];
+            }
+            catch (OutOfMemoryException oome)
+            {
+                //cerr << "Could not allocate buffer memory." << endl;
+                return false;
             }
 
             return true;

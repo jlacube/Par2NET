@@ -21,5 +21,20 @@ namespace Par2NET
         {
             throw new NotImplementedException();
         }
+
+        internal bool IsOpen()
+        {
+            throw new NotImplementedException();
+        }
+
+        internal void Close()
+        {
+            throw new NotImplementedException();
+        }
+
+        internal void Delete()
+        {
+            throw new NotImplementedException();
+        }
     }
 }
