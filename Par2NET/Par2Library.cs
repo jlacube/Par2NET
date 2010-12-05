@@ -347,18 +347,18 @@ namespace Par2NET
             //    return ParResult.LogicError;
 
             // 1st a quick verify to extract basic information from files like md5 hashes to be able to match files with wrong names
-            if (!setids[setid].QuickVerifySourceFiles())
-                return ParResult.LogicError;
+            //if (!setids[setid].QuickVerifySourceFiles())
+            //    return ParResult.LogicError;
 
             // Attempt to verify all of the source files
             if (!setids[setid].VerifySourceFiles())
                 return ParResult.LogicError;
 
             // Find out how much data we have found
-            //UpdateVerificationResults();
+            setids[setid].UpdateVerificationResults();
 
             // Check the verification results and report the results
-            //if (!CheckVerificationResults())
+            //if (!setids[setid].CheckVerificationResults())
             //    return ParResult.RepairNotPossible;
             
             // TODO: Send return with

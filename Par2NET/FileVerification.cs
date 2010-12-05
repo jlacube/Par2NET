@@ -57,5 +57,10 @@ namespace Par2NET
         {
             return completefile;
         }
+
+        internal uint BlockCount()
+        {
+            return (uint)FileVerificationPacket.blockcount;
+        }
     }
 }

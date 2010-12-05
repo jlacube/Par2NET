@@ -124,5 +124,31 @@ namespace Par2NET.Packets
 
             return true;
         }
+
+        internal bool WriteData(ulong position, // Position within the block
+                                  uint size,     // Size of the memory buffer
+                                  byte[] buffer,   // Pointer to memory buffer
+                                  ulong start,    // Start index for the buffer
+                                  out uint wrote)    // Amount actually written
+        {
+            wrote = 0;
+
+            // Check to see if the position from which data is to be written
+            // is within the bounds of the data block
+            if (length > position)
+            {
+                // Compute the file offset and how much data to physically write to disk
+                ulong fileoffset = offset + position;
+                uint have = (uint)Math.Min((ulong)size, length - position);
+
+                // Write the data from the buffer to disk
+                if (!diskfile.Write(fileoffset, buffer, start, have))
+                    return false;
+
+                wrote = have;
+            }
+
+            return true;
+        }
     }
 }

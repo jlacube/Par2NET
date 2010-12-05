@@ -36,7 +36,7 @@ namespace FastGaloisFields
         {
         }
 
-        public bool Process(uint size, uint inputindex, Galois16[] inputbuffer, uint outputindex, Galois16[] outputbuffer)
+        public bool Process(uint size, uint inputindex, byte[] inputbuffer, uint outputindex, byte[] outputbuffer)
         {
             // Optimization: it occurs frequently the function exits early on, so inline the start.
             // This resulted in a speed gain of approx. 8% in repairing.
@@ -51,7 +51,7 @@ namespace FastGaloisFields
             return InternalProcess(factor, size, inputbuffer, outputbuffer);
         }
 
-        private bool InternalProcess(Galois16 factor, uint size, Galois16[] inputbuffer, Galois16[] outputbuffer)
+        private bool InternalProcess(Galois16 factor, uint size, byte[] inputbuffer, byte[] outputbuffer)
         {
             //TODO : Rewrite with TPL
 
@@ -60,13 +60,13 @@ namespace FastGaloisFields
             // Process the data
             for (uint i = 0; i < size; i++)
             {
-                outputbuffer[i] = inputbuffer[i] * factor;
+                outputbuffer[i] = (byte)(((Galois16)inputbuffer[i]) * factor.Value);
             }
 
             return true;
         }
 
-        bool SetOutput(bool present, ushort exponent)
+        public bool SetOutput(bool present, ushort exponent)
         {
             // Store the exponent and whether or not the recovery block is present or missing
             outputrows.Add(new RSOutputRow(present, exponent));
@@ -86,7 +86,7 @@ namespace FastGaloisFields
             return true;
         }
 
-        bool SetOutput(bool present, ushort lowexponent, ushort highexponent)
+        internal bool SetOutput(bool present, ushort lowexponent, ushort highexponent)
         {
             for (uint exponent = lowexponent; exponent <= highexponent; exponent++)
             {
@@ -99,7 +99,7 @@ namespace FastGaloisFields
 
         // Set which of the source files are present and which are missing
         // and compute the base values to use for the vandermonde matrix.
-        bool SetInput(bool[] present)
+        public bool SetInput(bool[] present)
         {
             inputcount = (uint)present.Length;
 
@@ -147,7 +147,7 @@ namespace FastGaloisFields
 
         // Record that the specified number of source files are all present
         // and compute the base values to use for the vandermonde matrix.
-        bool SetInput(uint count)
+        internal bool SetInput(uint count)
         {
             inputcount = count;
 
@@ -185,7 +185,7 @@ namespace FastGaloisFields
         }
 
         // Construct the Vandermonde matrix and solve it if necessary
-        bool Compute()
+        public bool Compute()
         {
             uint outcount = datamissing + parmissing;
             uint incount = datapresent + datamissing;

@@ -11,10 +11,11 @@ namespace Par2NET.Packets
     {
         public PacketHeader header;
         public UInt32 exponent;
-        //public byte[] data; 
+        public DataBlock datablock;
         public string filename;
         public Int32 offset;
         public Int32 length;
+        public DiskFile diskfile = null;
 
         public int GetSize()
         {
@@ -35,16 +36,20 @@ namespace Par2NET.Packets
             tmpPacket.length = (int)header.length - header.GetSize() - sizeof(UInt32);
             tmpPacket.filename = filename;
 
-            //// Data is specific to read since it's dependant of packet.length
-            //int data_offset = index + offset;
-            //int data_size = (int)header.length - header.GetSize() - sizeof(UInt32);
+            tmpPacket.diskfile = new DiskFile();
+            tmpPacket.diskfile.Open(filename);
 
-            //tmpPacket.data = new byte[data_size];
-
-            //Buffer.BlockCopy(bytes, index + offset, tmpPacket.data, 0, tmpPacket.data.Length * sizeof(byte));
-            //offset += tmpPacket.data.Length * sizeof(byte);
+            tmpPacket.datablock = new DataBlock();
+            // Set the data block to immediatly follow the header on disk
+            tmpPacket.datablock.SetLocation(tmpPacket.diskfile, (ulong)tmpPacket.offset);
+            tmpPacket.datablock.SetLength((ulong)tmpPacket.length);
 
             return tmpPacket;
+        }
+
+        internal DataBlock GetDataBlock()
+        {
+            return datablock;
         }
     }
 }

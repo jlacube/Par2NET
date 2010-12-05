@@ -120,6 +120,8 @@ namespace Par2NET
                             //TODO : correct offset counter for last block
                             Console.WriteLine("block found at offset {0}, crc {1}", (br.BaseStream.Position - nbRead + offset), entry.crc);
 
+                            entry.SetBlock(new DiskFile(filename), offset);
+
                             offset += blocksize;
                         }
                         else

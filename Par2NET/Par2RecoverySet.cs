@@ -5,6 +5,7 @@ using System.Text;
 
 using Par2NET.Packets;
 using System.IO;
+using FastGaloisFields;
 
 namespace Par2NET
 {
@@ -30,6 +31,12 @@ namespace Par2NET
 
         public byte[] inputbuffer = null;             // Buffer for reading DataBlocks (chunksize)
         public byte[] outputbuffer = null;            // Buffer for writing DataBlocks (chunksize * missingblockcount)
+
+        private List<DataBlock> inputblocks = new List<DataBlock>();             // Which DataBlocks will be read from disk
+        private List<DataBlock> copyblocks = new List<DataBlock>();              // Which DataBlocks will copied back to disk
+        private List<DataBlock> outputblocks = new List<DataBlock>();            // Which DataBlocks have to calculated using RS
+
+        ReedSolomonGalois16     rs = new ReedSolomonGalois16();                      // The Reed Solomon matrix.
 
         private List<FileVerification> verifylist = new List<FileVerification>();
 
@@ -180,6 +187,12 @@ namespace Par2NET
                     if (!File.Exists(fileVer.TargetFileName))
                         continue;
 
+                    // Yes. Record that fact.
+                    fileVer.SetTargetExists(true);
+
+                    // Remember that the DiskFile is the target file
+                    fileVer.SetTargetFile(new DiskFile(fileVer.TargetFileName));
+
                     result &= (VerifyFile(fileVer) != null);
                         
                 }   
@@ -324,9 +337,114 @@ namespace Par2NET
             return true;
         }
 
+        private void Resize(ref List<DataBlock> list, uint length)
+        {
+            list = new List<DataBlock>((int)length);
+
+            for (int i = 0; i < length; ++i)
+            {
+                list.Add((DataBlock)null);
+            }
+        }
+
+        private void Resize(ref List<bool> list, uint length)
+        {
+            list = new List<bool>((int)length);
+
+            for (int i = 0; i < length; ++i)
+            {
+                list.Add(false);
+            }
+        }
+
+        // Work out which data blocks are available, which need to be copied
+        // directly to the output, and which need to be recreated, and compute
+        // the appropriate Reed Solomon matrix.
         internal bool ComputeRSmatrix()
         {
-            throw new NotImplementedException();
+            Resize(ref inputblocks, sourceblockcount);       // The DataBlocks that will read from disk
+            Resize(ref copyblocks, availableblockcount);     // Those DataBlocks which need to be copied
+            Resize(ref outputblocks, missingblockcount);     // Those DataBlocks that will re recalculated
+
+            // Build an array listing which source data blocks are present and which are missing
+            List<bool> present = new List<bool>();
+            Resize(ref present, sourceblockcount);
+
+            int index = 0;
+
+            int inputindex = 0;
+            int copyindex = 0;
+            int outputindex = 0;
+
+            // Iterate through all source blocks for all files
+            foreach (FileVerification fileVer in SourceFiles)
+            {
+                for (int i = 0; i < fileVer.SourceBlocks.Count; i++)
+                {
+                    DataBlock sourceblock = fileVer.SourceBlocks[i];
+                    DataBlock targetblock = fileVer.TargetBlocks[i];
+
+                    // Was this block found
+                    if (sourceblock.IsSet())
+                    {
+                        // Record that the block was found
+                        present[index] = true;
+
+                        // Add the block to the list of those which will be read 
+                        // as input (and which might also need to be copied
+                        inputblocks[index] = sourceblock;
+                        copyblocks[index] = targetblock;
+
+                        ++inputindex;
+                        ++copyindex;
+                    }
+                    else
+                    {
+                        // Record that the block was missing
+                        present[index] = false;
+
+                        // Add the block to the list of those to be written
+                        outputblocks[index] = targetblock;
+                        ++outputindex;
+                    }
+
+                    ++index;
+                }
+            }
+
+            // Set the number of source blocks and which of them are present
+            if (!rs.SetInput(present.ToArray()))
+                return false;
+
+            // Start iterating through the available recovery packets
+            int recoverypacketindex = 0;
+
+            // Continue to fill the remaining list of data blocks to be read
+            while (inputindex < inputblocks.Count)
+            {
+                // Get the next available recovery packet
+                RecoveryPacket rp = RecoveryPackets[recoverypacketindex];
+
+                // Get the DataBlock from the recovery packet
+                DataBlock recoveryblock = rp.GetDataBlock();
+
+                // Add the recovery block to the list of blocks that will be read
+                inputblocks[inputindex] = recoveryblock;
+
+                // Record that the corresponding exponent value is the next one
+                // to use in the RS matrix
+                if (!rs.SetOutput(true, (ushort)rp.exponent))
+                    return false;
+
+                ++inputindex;
+                ++recoverypacketindex;
+            }
+
+            // If we need to, compute and solve the RS matrix
+            if (missingblockcount == 0)
+                return true;
+
+            return rs.Compute();
         }
 
         internal void DeleteIncompleteTargetFiles()
@@ -397,7 +515,7 @@ namespace Par2NET
         }
 
         // Find out how much data we have found
-        private void UpdateVerificationResults()
+        internal void UpdateVerificationResults()
         {
             availableblockcount = 0;
             missingblockcount = 0;
@@ -477,7 +595,228 @@ namespace Par2NET
             return true;
         }
 
+        // Read source data, process it through the RS matrix and write it to disk.
         internal bool ProcessData(ulong blockoffset, uint blocklength)
+        {
+            ulong totalwritten = 0;
+
+            // Clear the output buffer
+            outputbuffer = new byte[chunksize * missingblockcount];
+
+            uint inputblockindex = 0;
+            uint copyblockindex = 0;
+            uint inputindex = 0;
+
+            DiskFile lastopenfile = null;
+
+            // Are there any blocks which need to be reconstructed
+            if (missingblockcount > 0)
+            {
+                // For each input block
+                //while (inputblock != inputblocks.end())       
+                while (inputblockindex < inputblocks.Count)
+                {
+                    DataBlock inputblock = inputblocks[(int)inputblockindex];
+                    DataBlock copyblock = copyblocks[(int)copyblockindex];
+
+                    // Are we reading from a new file?
+                    if (lastopenfile != inputblock.GetDiskFile())
+                    {
+                        // Close the last file
+                        if (lastopenfile != null)
+                        {
+                            lastopenfile.Close();
+                        }
+
+                        // Open the new file
+                        lastopenfile = inputblock.GetDiskFile();
+                        if (!lastopenfile.Open())
+                        {
+                            return false;
+                        }
+                    }
+
+                    // Read data from the current input block
+                    if (!inputblock.ReadData(blockoffset, blocklength, inputbuffer))
+                        return false;
+
+                    // Have we reached the last source data block
+                    if (copyblockindex != copyblocks.Count)
+                    {
+                        // Does this block need to be copied to the target file
+                        if (copyblock.IsSet())
+                        {
+                            uint wrote = 0;
+
+                            // Write the block back to disk in the new target file
+                            if (!copyblock.WriteData(blockoffset, blocklength, inputbuffer, out wrote))
+                                return false;
+
+                            totalwritten += wrote;
+                        }
+                        ++copyblockindex;
+                    }
+
+                    // Function to process things in multiple threads if appropariate
+                    if (!RepairMissingBlocks(blocklength, inputindex))
+                        return false;
+
+                    ++inputblockindex;
+                    ++inputindex;
+                }
+            }
+            else
+            {
+                // Reconstruction is not required, we are just copying blocks between files
+
+                // For each block that might need to be copied
+                while (copyblockindex != copyblocks.Count)
+                {
+                    DataBlock inputblock = inputblocks[(int)inputblockindex];
+                    DataBlock copyblock = copyblocks[(int)copyblockindex];
+
+                    // Does this block need to be copied
+                    if (copyblock.IsSet())
+                    {
+                        // Are we reading from a new file?
+                        if (lastopenfile != inputblock.GetDiskFile())
+                        {
+                            // Close the last file
+                            if (lastopenfile != null)
+                            {
+                                lastopenfile.Close();
+                            }
+
+                            // Open the new file
+                            lastopenfile = inputblock.GetDiskFile();
+                            if (!lastopenfile.Open())
+                            {
+                                return false;
+                            }
+                        }
+
+                        // Read data from the current input block
+                        if (!inputblock.ReadData(blockoffset, blocklength, inputbuffer))
+                            return false;
+
+                        uint wrote = 0;
+                        if (!copyblock.WriteData(blockoffset, blocklength, inputbuffer, out wrote))
+                            return false;
+                        totalwritten += wrote;
+                    }
+
+                    //if (noiselevel > CommandLine::nlQuiet)
+                    //{
+                    //  // Update a progress indicator
+                    //  u32 oldfraction = (u32)(1000 * progress / totaldata);
+                    //  progress += blocklength;
+                    //  u32 newfraction = (u32)(1000 * progress / totaldata);
+
+                    //  if (oldfraction != newfraction)
+                    //  {
+                    //    cout << "Processing: " << newfraction/10 << '.' << newfraction%10 << "%\r" << flush;
+                    //  }
+                    //}
+
+                    ++copyblockindex;
+                    ++inputblockindex;
+                }
+            }
+
+            // Close the last file
+            if (lastopenfile != null)
+            {
+                lastopenfile.Close();
+            }
+
+            //if (noiselevel > CommandLine::nlQuiet)
+            //  cout << "Writing recovered data\r";
+
+            // For each output block that has been recomputed
+            for (uint outputindex = 0; outputindex < missingblockcount; outputindex++)
+            {
+                DataBlock outputblock = outputblocks[(int)outputindex];
+
+                // Select the appropriate part of the output buffer
+                ulong startIndex = chunksize * outputindex;
+
+
+                // Write the data to the target file
+                uint wrote = 0;
+                if (!outputblock.WriteData(blockoffset, blocklength, outputbuffer, startIndex, out wrote))
+                    return false;
+                totalwritten += wrote;
+
+                //++outputblock;
+            }
+
+            //if (noiselevel > CommandLine::nlQuiet)
+            //  cout << "Wrote " << totalwritten << " bytes to disk" << endl;
+
+            return true;
+        }
+
+        private bool RepairMissingBlocks(uint blocklength, uint inputindex)
+        {
+            // Used from within ProcessData.
+
+            if (missingblockcount == 0)
+                return true;		// Nothing to do, actually
+
+            bool rv = true;		// Optimistic default
+
+            int lNumThreads = Environment.ProcessorCount;
+
+            // First, establish the number of blocks to be processed by each thread. Of course the last
+            // one started might get some less...
+            int lNumBlocksPerThread = (int)(missingblockcount - 1) / lNumThreads + 1;		// Round up
+            uint lCurrentStartBlockNo = 0;
+
+            while (lCurrentStartBlockNo < missingblockcount)
+            {
+                uint lNextStartBlockNo = (uint)(lCurrentStartBlockNo + lNumBlocksPerThread);
+                if (lNextStartBlockNo > missingblockcount)
+                    lNextStartBlockNo = missingblockcount;		// Constrain
+
+                RepairMissingBlockRange(blocklength, inputindex, lCurrentStartBlockNo, lNextStartBlockNo);
+            }
+
+            return rv;
+        }
+
+        private void RepairMissingBlockRange(uint blocklength, uint inputindex, uint aStartBlockNo, uint aEndBlockNo)
+        {
+            // This function runs in multiple threads.
+            // For each output block
+            for (uint outputindex = aStartBlockNo; outputindex < aEndBlockNo; outputindex++)
+            {
+                // Select the appropriate part of the output buffer
+                byte[] outbuf = new byte[blocklength];
+                Buffer.BlockCopy(outputbuffer, (int)(chunksize * outputindex), outbuf, 0, outbuf.Length);
+
+                // Process the data
+                rs.Process(blocklength, inputindex, inputbuffer, outputindex, outbuf);
+
+                //if (noiselevel > CommandLine::nlQuiet)
+                //{
+                //    // Update a progress indicator. This is thread-safe with a simple mutex
+                //    pthread_mutex_lock (&progressMutex);
+                //    progress += blocklength;
+                //    u32 newfraction = (u32)(1000 * progress / totaldata);
+
+                //    // Only report "Repairing" when a certain amount of progress has been made
+                //    // since last time, or when the progress is 100%
+                //    if ((newfraction - previouslyReportedProgress >= 10) || (newfraction == 1000))
+                //    {
+                //        cout << "Repairing: " << newfraction/10 << '.' << newfraction%10 << "%\r" << flush;
+                //        previouslyReportedProgress = newfraction;
+                //    }
+                //    pthread_mutex_unlock (&progressMutex);
+                //}
+            }
+        }
+
+        internal bool CheckVerificationResults()
         {
             throw new NotImplementedException();
         }

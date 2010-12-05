@@ -15,10 +15,16 @@ namespace Par2NET.Packets
     {
         public byte[] hash = new byte[16];
         public UInt32 crc;
+        private DataBlock datablock = new DataBlock();
 
         public static int GetSize()
         {
             return 16 * sizeof(byte) + sizeof(UInt32);
+        }
+
+        internal void SetBlock(DiskFile diskfile, int offset)
+        {
+            datablock.SetLocation(diskfile, (ulong)offset);
         }
     }
 
