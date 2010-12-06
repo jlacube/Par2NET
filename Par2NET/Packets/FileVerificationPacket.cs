@@ -15,7 +15,7 @@ namespace Par2NET.Packets
     {
         public byte[] hash = new byte[16];
         public UInt32 crc;
-        private DataBlock datablock = new DataBlock();
+        public DataBlock datablock = new DataBlock();
 
         public static int GetSize()
         {

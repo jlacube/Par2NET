@@ -340,8 +340,8 @@ namespace Par2NET
             if (!setids[setid].AllocateSourceBlocks())
                 return ParResult.LogicError;
 
-            //if (!setids[setid].PrepareVerificationHashTable())
-            //    return ParResult.LogicError;
+            if (!setids[setid].PrepareVerificationHashTable())
+                return ParResult.LogicError;
 
             //if (!setids[setid].ComputeWindowTable())
             //    return ParResult.LogicError;

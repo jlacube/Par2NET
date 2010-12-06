@@ -62,5 +62,10 @@ namespace Par2NET
         {
             return (uint)FileVerificationPacket.blockcount;
         }
+
+        internal FileVerificationPacket GetVerificationPacket()
+        {
+            return FileVerificationPacket;
+        }
     }
 }

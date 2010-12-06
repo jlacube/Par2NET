@@ -36,6 +36,8 @@ namespace Par2NET
         private List<DataBlock> copyblocks = new List<DataBlock>();              // Which DataBlocks will copied back to disk
         private List<DataBlock> outputblocks = new List<DataBlock>();            // Which DataBlocks have to calculated using RS
 
+        private Dictionary<uint, FileVerificationEntry> verificationhashtable = new Dictionary<uint, FileVerificationEntry>();
+
         ReedSolomonGalois16     rs = new ReedSolomonGalois16();                      // The Reed Solomon matrix.
 
         private List<FileVerification> verifylist = new List<FileVerification>();
@@ -138,11 +140,11 @@ namespace Par2NET
 
         internal bool AllocateSourceBlocks()
         {
-            ulong sourceblockcount = 0;
+            //ulong sourceblockcount = 0;
 
             foreach (FileVerification fileVer in SourceFiles)
             {
-                sourceblockcount += fileVer.FileVerificationPacket.blockcount;
+                sourceblockcount += (uint)fileVer.FileVerificationPacket.blockcount;
             }
 
             // Why return true if there is no sourceblock available ?
@@ -247,7 +249,14 @@ namespace Par2NET
 
         private bool? VerifyFile(Par2NET.FileVerification fileVer)
         {
-            FileChecker.CheckFile(fileVer.TargetFileName, (int)this.MainPacket.blocksize, fileVer.FileVerificationPacket.entries, fileVer.FileDescriptionPacket.hash16k, fileVer.FileDescriptionPacket.hashfull);
+            MatchType matchType = MatchType.NoMatch;
+
+            FileChecker.CheckFile(fileVer.TargetFileName, (int)this.MainPacket.blocksize, fileVer.FileVerificationPacket.entries, fileVer.FileDescriptionPacket.hash16k, fileVer.FileDescriptionPacket.hashfull, ref matchType);
+
+            if (matchType == MatchType.FullMatch)
+            {
+                fileVer.SetCompleteFile(fileVer.GetTargetFile());
+            }
 
             return false;
         }
@@ -819,6 +828,57 @@ namespace Par2NET
         internal bool CheckVerificationResults()
         {
             throw new NotImplementedException();
+        }
+
+        // Create a verification hash table for all files for which we have not
+        // found a complete version of the file and for which we have
+        // a verification packet
+        internal bool PrepareVerificationHashTable()
+        {
+            foreach (FileVerification sourcefile in SourceFiles)
+            {
+                if (sourcefile == null)
+                    continue;
+
+                // Do we have a verification packet
+                if (sourcefile.GetVerificationPacket() == null)
+                    continue;
+
+                // Yes. Load the verification entries into the hash table
+                Load(sourcefile, MainPacket.blocksize);
+            }
+
+            return true;
+        }
+
+        private void Load(Par2NET.FileVerification sourcefile, ulong blocksize)
+        {
+            // Get information from the sourcefile
+            FileVerificationPacket verificationPacket = sourcefile.GetVerificationPacket();
+            uint blockcount = (uint)verificationPacket.blockcount;
+
+            // Iterate throught the data blocks for the source file and the verification
+            // entries in the verification packet.
+            uint blocknumber = 0;
+            uint sourceblockindex = 0;
+
+            while (blocknumber < blockcount)
+            {
+                DataBlock datablock = sourcefile.SourceBlocks[(int)sourceblockindex];
+
+                // Create a new VerificationHashEntry with the details for the current
+                // data block and verification entry.
+                FileVerificationEntry entry = verificationPacket.entries[(int)blocknumber];
+                entry.datablock = datablock;
+
+                // Create a new VerificationHashEntry with the details for the current
+                // data block and verification entry.
+                if (!verificationhashtable.ContainsKey(entry.crc))
+                    verificationhashtable.Add(entry.crc, entry);
+
+                ++blocknumber;
+                ++sourceblockindex;
+            }
         }
     }
 }

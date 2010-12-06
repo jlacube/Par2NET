@@ -56,10 +56,12 @@ namespace Par2NET
             }
         }
 
-        public static void CheckFile(string filename, int blocksize, List<FileVerificationEntry> fileVerEntry, byte[] md5hash16k, byte[] md5hash)
+        public static void CheckFile(string filename, int blocksize, List<FileVerificationEntry> fileVerEntry, byte[] md5hash16k, byte[] md5hash, ref MatchType matchType)
         {
             //TODO : Maybe rewrite in TPL for slide calculation
             //TODO : Maybe search against all sourcefiles (case of misnamed files)
+
+            matchType = MatchType.FullMatch;
 
             using (BinaryReader br = new BinaryReader(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read, 2*blocksize)))
             {
@@ -120,12 +122,14 @@ namespace Par2NET
                             //TODO : correct offset counter for last block
                             Console.WriteLine("block found at offset {0}, crc {1}", (br.BaseStream.Position - nbRead + offset), entry.crc);
 
-                            entry.SetBlock(new DiskFile(filename), offset);
+                            entry.SetBlock(new DiskFile(filename), (int)(br.BaseStream.Position - nbRead + offset));
 
                             offset += blocksize;
                         }
                         else
                         {
+                            matchType = MatchType.PartialMatch;
+
                             if (br.BaseStream.Position == br.BaseStream.Length)
                                 break;
                             else
@@ -157,6 +161,19 @@ namespace Par2NET
                     } while (offset < 2*blocksize); // Stop condition : When index is equal to blocksize, end of sliding buffer is reached, so we have to read from file
                 }
             }
+
+            bool atLeastOne = false;
+            foreach (FileVerificationEntry entry in fileVerEntry)
+            {
+                if (entry.datablock.diskfile != null)
+                {
+                    atLeastOne = true;
+                    break;
+                }
+            }
+
+            if (!atLeastOne)
+                matchType = MatchType.NoMatch;
         }
     }
 }
