@@ -358,8 +358,8 @@ namespace Par2NET
             setids[setid].UpdateVerificationResults();
 
             // Check the verification results and report the results
-            //if (!setids[setid].CheckVerificationResults())
-            //    return ParResult.RepairNotPossible;
+            if (!setids[setid].CheckVerificationResults())
+                return ParResult.RepairNotPossible;
             
             // TODO: Send return with
             // ParResult.Success || ParResult.RepairPossible || ParResult.RepairNotPossible

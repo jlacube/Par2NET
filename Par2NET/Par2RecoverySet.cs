@@ -37,6 +37,7 @@ namespace Par2NET
         private List<DataBlock> outputblocks = new List<DataBlock>();            // Which DataBlocks have to calculated using RS
 
         private Dictionary<uint, FileVerificationEntry> verificationhashtable = new Dictionary<uint, FileVerificationEntry>();
+        private Dictionary<uint, FileVerificationEntry> verificationhashtablefull = new Dictionary<uint, FileVerificationEntry>();
 
         ReedSolomonGalois16     rs = new ReedSolomonGalois16();                      // The Reed Solomon matrix.
 
@@ -251,7 +252,7 @@ namespace Par2NET
         {
             MatchType matchType = MatchType.NoMatch;
 
-            FileChecker.CheckFile(fileVer.TargetFileName, (int)this.MainPacket.blocksize, fileVer.FileVerificationPacket.entries, fileVer.FileDescriptionPacket.hash16k, fileVer.FileDescriptionPacket.hashfull, ref matchType);
+            FileChecker.CheckFile(fileVer.TargetFileName, (int)this.MainPacket.blocksize, fileVer.FileVerificationPacket.entries, fileVer.FileDescriptionPacket.hash16k, fileVer.FileDescriptionPacket.hashfull, ref matchType, verificationhashtablefull, verificationhashtable);
 
             if (matchType == MatchType.FullMatch)
             {
@@ -825,9 +826,81 @@ namespace Par2NET
             }
         }
 
-        internal bool CheckVerificationResults()
+        // Check the verification results and report the results 
+        internal bool CheckVerificationResults(bool aSilent)
         {
-            throw new NotImplementedException();
+            // Is repair needed
+  if (completefilecount < MainPacket.recoverablefilecount || renamedfilecount > 0 || damagedfilecount > 0 || missingfilecount > 0)
+  {
+    if (!aSilent)
+    {
+        Console.WriteLine("Repair is required.");
+        Console.WriteLine();
+
+
+          if (renamedfilecount > 0) Console.WriteLine("{0} file(s) have the wrong name.", renamedfilecount);
+          if (missingfilecount > 0) Console.WriteLine("{0} file(s) are missing.", missingfilecount);
+          if (damagedfilecount > 0) Console.WriteLine("{0} file(s) exist but are damaged.", damagedfilecount);
+          if (completefilecount > 0) Console.WriteLine("{0} file(s) are ok.", completefilecount);
+
+          cout << "You have " << availableblockcount 
+               << " out of " << sourceblockcount 
+               << " data blocks available." << endl;
+          if (recoverypacketmap.size() > 0)
+            cout << "You have " << (u32)recoverypacketmap.size() 
+                 << " recovery blocks available." << endl;
+        }
+    }
+
+    // Is repair possible
+    if (RecoveryPackets.Count  >= missingblockcount)
+    {
+      if (!aSilent)
+      {
+          if (noiselevel > CommandLine::nlSilent)
+            cout << "Repair is possible." << endl;
+
+          if (noiselevel > CommandLine::nlQuiet)
+          {
+            if (recoverypacketmap.size() > missingblockcount)
+              cout << "You have an excess of " 
+                   << (u32)recoverypacketmap.size() - missingblockcount
+                   << " recovery blocks." << endl;
+
+            if (missingblockcount > 0)
+              cout << missingblockcount
+                   << " recovery blocks will be used to repair." << endl;
+            else if (recoverypacketmap.size())
+              cout << "None of the recovery blocks will be used for the repair." << endl;
+          }
+      }
+      return true;
+    }
+    else
+    {
+      if (!aSilent)
+      {
+          if (noiselevel > CommandLine::nlSilent)
+          {
+            cout << "Repair is not possible." << endl;
+            cout << "You need " << missingblockcount - recoverypacketmap.size()
+                 << " more recovery blocks to be able to repair." << endl;
+          }
+      }
+      return false;
+    }
+  }
+  else
+  {
+    if (!aSilent)
+    {
+        if (noiselevel > CommandLine::nlSilent)
+          cout << "All files are correct, repair is not required." << endl;
+    }
+    return true;
+  }
+
+  return true;
         }
 
         // Create a verification hash table for all files for which we have not
@@ -875,6 +948,11 @@ namespace Par2NET
                 // data block and verification entry.
                 if (!verificationhashtable.ContainsKey(entry.crc))
                     verificationhashtable.Add(entry.crc, entry);
+
+                uint key = (uint)(entry.crc ^ (17 * Path.GetFileName(sourcefile.TargetFileName).GetHashCode()));
+
+                if (!verificationhashtablefull.ContainsKey(key))
+                    verificationhashtablefull.Add(key, entry);
 
                 ++blocknumber;
                 ++sourceblockindex;

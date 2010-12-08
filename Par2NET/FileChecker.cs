@@ -56,7 +56,7 @@ namespace Par2NET
             }
         }
 
-        public static void CheckFile(string filename, int blocksize, List<FileVerificationEntry> fileVerEntry, byte[] md5hash16k, byte[] md5hash, ref MatchType matchType)
+        public static void CheckFile(string filename, int blocksize, List<FileVerificationEntry> fileVerEntry, byte[] md5hash16k, byte[] md5hash, ref MatchType matchType, Dictionary<uint,FileVerificationEntry> hashfull, Dictionary<uint,FileVerificationEntry> hash)
         {
             //TODO : Maybe rewrite in TPL for slide calculation
             //TODO : Maybe search against all sourcefiles (case of misnamed files)
@@ -68,6 +68,8 @@ namespace Par2NET
                 CRC32NET.CRC32 crc32Hasher = new CRC32NET.CRC32();
                 MD5 md5Hasher = MD5.Create();
                 FastCRC32.FastCRC32 crc32 = new FastCRC32.FastCRC32((ulong)blocksize);
+
+                uint partial_key = (uint)(17 * Path.GetFileName(filename).GetHashCode());
 
                 while (br.BaseStream.Position < br.BaseStream.Length)
                 {
@@ -102,18 +104,32 @@ namespace Par2NET
                         stepping = false;
 
                         // Do we have a match in the FileVerificationEntry
-                        FileVerificationEntry entry = fileVerEntry.Find((FileVerificationEntry item) =>
+                        //FileVerificationEntry entry = fileVerEntry.Find((FileVerificationEntry item) =>
+                        //{
+                        //    if (item.crc == crc32Value)
+                        //    {
+                        //        // We find a CRC32 match, let's check the MD5 hash now
+                        //        byte[] md5Value = md5Hasher.ComputeHash(buffer, offset, blocksize);
+
+                        //        return ToolKit.ToHex(item.hash) == ToolKit.ToHex(md5Value);
+                        //    }
+
+                        //    return false;
+                        //});
+
+                        FileVerificationEntry entry = null;
+
+                        uint key = crc32Value ^ partial_key;
+
+                        if (hashfull.ContainsKey(key))
                         {
-                            if (item.crc == crc32Value)
-                            {
-                                // We find a CRC32 match, let's check the MD5 hash now
-                                byte[] md5Value = md5Hasher.ComputeHash(buffer, offset, blocksize);
-
-                                return ToolKit.ToHex(item.hash) == ToolKit.ToHex(md5Value);
-                            }
-
-                            return false;
-                        });
+                            entry = hashfull[key];
+                        }
+                        else
+                        {
+                            if (hash.ContainsKey(crc32Value))
+                                entry = hash[crc32Value];
+                        }
 
                         if (entry != null)
                         {
@@ -128,18 +144,16 @@ namespace Par2NET
                         }
                         else
                         {
-                            matchType = MatchType.PartialMatch;
-
                             if (br.BaseStream.Position == br.BaseStream.Length)
                                 break;
                             else
                             {
+                                matchType = MatchType.PartialMatch;
                                 outch = buffer[offset];
                                 ++offset;
                                 stepping = true;
                             }
                         }
-
 
                         if (offset >= 2 * blocksize)
                             break;
