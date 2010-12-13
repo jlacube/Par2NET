@@ -332,9 +332,9 @@ namespace Par2NET
                     for (int index = 0; index < fileVer.TargetBlocks.Count; index++)
                     {
                         DataBlock tb = fileVer.TargetBlocks[index];
-                        tb.offset = offset;
-                        tb.length = Math.Min(MainPacket.blocksize, filesize - offset);
-
+                        tb.SetLocation(targetfile, offset);
+                        tb.SetLength((ulong) Math.Min(MainPacket.blocksize, filesize - offset));
+                       
                         offset += MainPacket.blocksize;
                     }
 
@@ -402,8 +402,8 @@ namespace Par2NET
 
                         // Add the block to the list of those which will be read 
                         // as input (and which might also need to be copied
-                        inputblocks[index] = sourceblock;
-                        copyblocks[index] = targetblock;
+                        inputblocks[inputindex] = sourceblock;
+                        copyblocks[copyindex] = targetblock;
 
                         ++inputindex;
                         ++copyindex;
@@ -414,7 +414,7 @@ namespace Par2NET
                         present[index] = false;
 
                         // Add the block to the list of those to be written
-                        outputblocks[index] = targetblock;
+                        outputblocks[outputindex] = targetblock;
                         ++outputindex;
                     }
 
@@ -830,77 +830,62 @@ namespace Par2NET
         internal bool CheckVerificationResults(bool aSilent)
         {
             // Is repair needed
-  if (completefilecount < MainPacket.recoverablefilecount || renamedfilecount > 0 || damagedfilecount > 0 || missingfilecount > 0)
-  {
-    if (!aSilent)
-    {
-        Console.WriteLine("Repair is required.");
-        Console.WriteLine();
+            if (completefilecount < MainPacket.recoverablefilecount || renamedfilecount > 0 || damagedfilecount > 0 || missingfilecount > 0)
+            {
+                if (!aSilent)
+                {
+                    Console.WriteLine("Repair is required.");
+                    Console.WriteLine();
 
 
-          if (renamedfilecount > 0) Console.WriteLine("{0} file(s) have the wrong name.", renamedfilecount);
-          if (missingfilecount > 0) Console.WriteLine("{0} file(s) are missing.", missingfilecount);
-          if (damagedfilecount > 0) Console.WriteLine("{0} file(s) exist but are damaged.", damagedfilecount);
-          if (completefilecount > 0) Console.WriteLine("{0} file(s) are ok.", completefilecount);
+                    if (renamedfilecount > 0) Console.WriteLine("{0} file(s) have the wrong name.", renamedfilecount);
+                    if (missingfilecount > 0) Console.WriteLine("{0} file(s) are missing.", missingfilecount);
+                    if (damagedfilecount > 0) Console.WriteLine("{0} file(s) exist but are damaged.", damagedfilecount);
+                    if (completefilecount > 0) Console.WriteLine("{0} file(s) are ok.", completefilecount);
 
-          cout << "You have " << availableblockcount 
-               << " out of " << sourceblockcount 
-               << " data blocks available." << endl;
-          if (recoverypacketmap.size() > 0)
-            cout << "You have " << (u32)recoverypacketmap.size() 
-                 << " recovery blocks available." << endl;
-        }
-    }
+                    Console.WriteLine("You have {0} out of {1} datablocks available", availableblockcount, sourceblockcount);
 
-    // Is repair possible
-    if (RecoveryPackets.Count  >= missingblockcount)
-    {
-      if (!aSilent)
-      {
-          if (noiselevel > CommandLine::nlSilent)
-            cout << "Repair is possible." << endl;
+                    if (RecoveryPackets.Count > 0)
+                        Console.WriteLine("You have {0} recovery blocks available.", RecoveryPackets.Count);
+                }
 
-          if (noiselevel > CommandLine::nlQuiet)
-          {
-            if (recoverypacketmap.size() > missingblockcount)
-              cout << "You have an excess of " 
-                   << (u32)recoverypacketmap.size() - missingblockcount
-                   << " recovery blocks." << endl;
+                // Is repair possible
+                if (RecoveryPackets.Count >= missingblockcount)
+                {
+                    if (!aSilent)
+                    {
+                        Console.WriteLine("Repair is possible.");
 
-            if (missingblockcount > 0)
-              cout << missingblockcount
-                   << " recovery blocks will be used to repair." << endl;
-            else if (recoverypacketmap.size())
-              cout << "None of the recovery blocks will be used for the repair." << endl;
-          }
-      }
-      return true;
-    }
-    else
-    {
-      if (!aSilent)
-      {
-          if (noiselevel > CommandLine::nlSilent)
-          {
-            cout << "Repair is not possible." << endl;
-            cout << "You need " << missingblockcount - recoverypacketmap.size()
-                 << " more recovery blocks to be able to repair." << endl;
-          }
-      }
-      return false;
-    }
-  }
-  else
-  {
-    if (!aSilent)
-    {
-        if (noiselevel > CommandLine::nlSilent)
-          cout << "All files are correct, repair is not required." << endl;
-    }
-    return true;
-  }
+                        if (RecoveryPackets.Count > missingblockcount)
+                            Console.WriteLine("You have an excess of {0} recovery blocks", RecoveryPackets.Count - missingblockcount);
 
-  return true;
+                        if (missingblockcount > 0)
+                            Console.WriteLine("{0} recovery blocks will be used to repair.", missingblockcount);
+                        else if (RecoveryPackets.Count > 0)
+                            Console.WriteLine("None of the recovery blocks will be used for the repair.");
+                    }
+                    return true;
+                }
+                else
+                {
+                    if (!aSilent)
+                    {
+                        Console.WriteLine("Repair is not possible.");
+                        Console.WriteLine("You need {0} more recovery blocks to be able to repair.", missingblockcount - RecoveryPackets.Count);
+                    }
+                    return false;
+                }
+            }
+            else
+            {
+                if (!aSilent)
+                {
+                    Console.WriteLine("All files are correct, repair is not required.");
+                }
+                return true;
+            }
+
+            return true;
         }
 
         // Create a verification hash table for all files for which we have not

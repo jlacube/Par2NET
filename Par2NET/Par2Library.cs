@@ -222,7 +222,7 @@ namespace Par2NET
             string setid = setids.Keys.First();
 
             // Rename any damaged or missnamed target files.
-            if (!!setids[setid].RenameTargetFiles())
+            if (!setids[setid].RenameTargetFiles())
                 return ParResult.FileIOError;
 
             // Are we still missing any files
@@ -358,7 +358,7 @@ namespace Par2NET
             setids[setid].UpdateVerificationResults();
 
             // Check the verification results and report the results
-            if (!setids[setid].CheckVerificationResults())
+            if (!setids[setid].CheckVerificationResults(false))
                 return ParResult.RepairNotPossible;
             
             // TODO: Send return with
