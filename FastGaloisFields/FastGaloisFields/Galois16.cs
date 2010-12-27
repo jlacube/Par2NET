@@ -7,7 +7,8 @@ namespace FastGaloisFields
 {
     public class Galois16
     {
-        private GaloisTables.GaloisTable16 table = new GaloisTables.GaloisTable16();
+        private static GaloisTables.GaloisTable16 _table = new GaloisTables.GaloisTable16();
+        private FastGaloisFields.GaloisTables.GaloisTable16 table = Galois16._table;
         private ushort value = 0;
 
         public ushort Value

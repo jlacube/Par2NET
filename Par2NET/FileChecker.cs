@@ -56,12 +56,14 @@ namespace Par2NET
             }
         }
 
-        public static void CheckFile(string filename, int blocksize, List<FileVerificationEntry> fileVerEntry, byte[] md5hash16k, byte[] md5hash, ref MatchType matchType, Dictionary<uint,FileVerificationEntry> hashfull, Dictionary<uint,FileVerificationEntry> hash)
+        public static void CheckFile(DiskFile diskFile, string filename, int blocksize, List<FileVerificationEntry> fileVerEntry, byte[] md5hash16k, byte[] md5hash, ref MatchType matchType, Dictionary<uint,FileVerificationEntry> hashfull, Dictionary<uint,FileVerificationEntry> hash)
         {
             //TODO : Maybe rewrite in TPL for slide calculation
             //TODO : Maybe search against all sourcefiles (case of misnamed files)
 
             matchType = MatchType.FullMatch;
+
+            ulong _offset = 0;
 
             using (BinaryReader br = new BinaryReader(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read, 2*blocksize)))
             {
@@ -71,9 +73,11 @@ namespace Par2NET
 
                 uint partial_key = (uint)(17 * Path.GetFileName(filename).GetHashCode());
 
-                while (br.BaseStream.Position < br.BaseStream.Length)
+                long length = br.BaseStream.Length;
+                Stream baseStream = br.BaseStream;
+                while (baseStream.Position < length)
                 {
-                    int nbRead = Math.Min((2*blocksize), (int)(br.BaseStream.Length - br.BaseStream.Position));
+                    int nbRead = Math.Min((2 * blocksize), (int)(length - baseStream.Position));
 
                     // Prepare buffer
                     byte[] buffer = br.ReadBytes(nbRead);
@@ -103,20 +107,6 @@ namespace Par2NET
 
                         stepping = false;
 
-                        // Do we have a match in the FileVerificationEntry
-                        //FileVerificationEntry entry = fileVerEntry.Find((FileVerificationEntry item) =>
-                        //{
-                        //    if (item.crc == crc32Value)
-                        //    {
-                        //        // We find a CRC32 match, let's check the MD5 hash now
-                        //        byte[] md5Value = md5Hasher.ComputeHash(buffer, offset, blocksize);
-
-                        //        return ToolKit.ToHex(item.hash) == ToolKit.ToHex(md5Value);
-                        //    }
-
-                        //    return false;
-                        //});
-
                         FileVerificationEntry entry = null;
 
                         uint key = crc32Value ^ partial_key;
@@ -136,21 +126,24 @@ namespace Par2NET
                             // We found a complete match, so go to next block !
 
                             //TODO : correct offset counter for last block
-                            Console.WriteLine("block found at offset {0}, crc {1}", (br.BaseStream.Position - nbRead + offset), entry.crc);
+                            Console.WriteLine("block found at offset {0}, crc {1}", _offset, entry.crc);
 
-                            entry.SetBlock(new DiskFile(filename), (int)(br.BaseStream.Position - nbRead + offset));
+                            //TODO: Pbm DiskFile need to be uniq and given as param for CheckFile methods, need rewrite based on //bool Par2Repairer::VerifyFilesInVerifyList()// code
+                            entry.SetBlock(diskFile, (int)(_offset));
 
                             offset += blocksize;
+                            _offset += (ulong)blocksize;
                         }
                         else
                         {
-                            if (br.BaseStream.Position == br.BaseStream.Length)
+                            if (baseStream.Position == length)
                                 break;
                             else
                             {
                                 matchType = MatchType.PartialMatch;
                                 outch = buffer[offset];
                                 ++offset;
+                                ++_offset;
                                 stepping = true;
                             }
                         }
@@ -163,12 +156,12 @@ namespace Par2NET
                             byte[] newBuffer = new byte[buffer.Length];
                             Buffer.BlockCopy(buffer, offset, newBuffer, 0, 2 * blocksize - offset);
 
-                            byte[] readBytes = br.ReadBytes(Math.Min(offset, (int)(br.BaseStream.Length - br.BaseStream.Position)));
+                            byte[] readBytes = br.ReadBytes(Math.Min(offset, (int)(length - baseStream.Position)));
 
                             Buffer.BlockCopy(readBytes, 0, newBuffer, 2 * blocksize - offset, readBytes.Length);
 
                             offset = 0;
-
+                            
                             buffer = newBuffer;
                         }
 

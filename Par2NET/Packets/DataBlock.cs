@@ -82,6 +82,9 @@ namespace Par2NET.Packets
                 ulong fileoffset = offset + position;
                 uint want = (uint)Math.Min((ulong)size, length - position);
 
+                if (want < buffer.Length)
+                    Array.Clear(buffer, 0, buffer.Length);
+
                 // Read the data from the file into the buffer
                 if (!diskfile.Read(fileoffset, buffer, want))
                     return false;

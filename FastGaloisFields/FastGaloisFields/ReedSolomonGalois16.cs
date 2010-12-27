@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using FastGaloisFields.GaloisTables;
 
 namespace FastGaloisFields
 {
@@ -28,12 +29,15 @@ namespace FastGaloisFields
 
         Galois16[] leftmatrix = null;       // The main matrix
 
+        GaloisLongMultiplyTable16 glmt;
+
         // When the matrices are initialised: values of the form base ^ exponent are
         // stored (where the base values are obtained from database[] and the exponent
         // values are obtained from outputrows[]).
 
         public ReedSolomonGalois16()
         {
+            glmt = new GaloisLongMultiplyTable16();
         }
 
         public bool Process(uint size, uint inputindex, byte[] inputbuffer, uint outputindex, byte[] outputbuffer)
@@ -55,12 +59,40 @@ namespace FastGaloisFields
         {
             //TODO : Rewrite with TPL
 
-            // Treat the buffers as arrays of 16-bit Galois values.
+            //if (true)
+            //{
+
+            //}
+            //else
+            //{
+                // Treat the buffers as arrays of 16-bit Galois values.
+                // Awfully long to execute
+
+            // Create Galois16 inputbuffer
+            Galois16[] inputGalois16 = new Galois16[inputbuffer.Length / 2];
+
+            // Create Galois16 outputbuffer
+            Galois16[] outputGalois16 = new Galois16[inputGalois16.Length];
+
+            // Fill Galois16 input buffer with inpuntbuffer values
+            for (int i = 0; i < inputGalois16.Length; ++i)
+            {
+                inputGalois16[i] = (Galois16)(inputbuffer[2*i+1] << 8 | inputbuffer[2*i]);
+                outputGalois16[i] = (Galois16)(outputbuffer[2 * i + 1] << 8 | outputbuffer[2 * i]);
+            }
 
             // Process the data
-            for (uint i = 0; i < size; i++)
+            for (uint i = 0; i < outputGalois16.Length; ++i)
             {
-                outputbuffer[i] = (byte)(((Galois16)inputbuffer[i]) * factor.Value);
+                outputGalois16[i] += inputGalois16[i] * factor.Value;
+            }
+            //}
+
+            // Copy back data from Galois16 output buffer to outputbuffer (byte)
+            for (int i = 0; i < outputGalois16.Length; ++i)
+            {
+                outputbuffer[2*i+1] = (byte)(outputGalois16[i].Value >> 8 & 0xFF);
+                outputbuffer[2*i] = (byte)(outputGalois16[i].Value & 0xFF);
             }
 
             return true;
@@ -283,7 +315,7 @@ namespace FastGaloisFields
             }
 
             // One row for each recovery block being computed
-            for (uint row = 0; row < outputrows.Count; row++)
+            for (uint row = 0; row < parmissing; row++)
             {
                 RSOutputRow outputrow = outputrows[(int)row];
 
@@ -299,7 +331,7 @@ namespace FastGaloisFields
                 // Get the exponent of the next missing recovery block
                 while (outputrow.present)
                 {
-                    row++;
+                    outputrow = outputrows[(int)++row];
                 }
                 ushort exponent = outputrow.exponent;
 

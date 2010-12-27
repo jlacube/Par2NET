@@ -40,6 +40,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="GaloisLongMultiplyTable16.cs" />
     <Compile Include="ReedSolomonGalois16.cs" />
     <Compile Include="GaloisTable16.cs" />
     <Compile Include="ReedSolomon.cs" />

@@ -39,7 +39,8 @@ namespace Par2NET
         private Dictionary<uint, FileVerificationEntry> verificationhashtable = new Dictionary<uint, FileVerificationEntry>();
         private Dictionary<uint, FileVerificationEntry> verificationhashtablefull = new Dictionary<uint, FileVerificationEntry>();
 
-        ReedSolomonGalois16     rs = new ReedSolomonGalois16();                      // The Reed Solomon matrix.
+        static ReedSolomonGalois16     _rs = new ReedSolomonGalois16();                      // The Reed Solomon matrix.
+        ReedSolomonGalois16 rs = Par2RecoverySet._rs;
 
         private List<FileVerification> verifylist = new List<FileVerification>();
 
@@ -252,11 +253,12 @@ namespace Par2NET
         {
             MatchType matchType = MatchType.NoMatch;
 
-            FileChecker.CheckFile(fileVer.TargetFileName, (int)this.MainPacket.blocksize, fileVer.FileVerificationPacket.entries, fileVer.FileDescriptionPacket.hash16k, fileVer.FileDescriptionPacket.hashfull, ref matchType, verificationhashtablefull, verificationhashtable);
+            FileChecker.CheckFile(fileVer.GetTargetFile(), fileVer.TargetFileName, (int)this.MainPacket.blocksize, fileVer.FileVerificationPacket.entries, fileVer.FileDescriptionPacket.hash16k, fileVer.FileDescriptionPacket.hashfull, ref matchType, verificationhashtablefull, verificationhashtable);
 
             if (matchType == MatchType.FullMatch)
             {
                 fileVer.SetCompleteFile(fileVer.GetTargetFile());
+                return true;
             }
 
             return false;
@@ -651,7 +653,7 @@ namespace Par2NET
                         return false;
 
                     // Have we reached the last source data block
-                    if (copyblockindex != copyblocks.Count)
+                    if (copyblockindex != copyblocks.Count-1)
                     {
                         // Does this block need to be copied to the target file
                         if (copyblock.IsSet())
@@ -789,6 +791,8 @@ namespace Par2NET
                     lNextStartBlockNo = missingblockcount;		// Constrain
 
                 RepairMissingBlockRange(blocklength, inputindex, lCurrentStartBlockNo, lNextStartBlockNo);
+
+                lCurrentStartBlockNo = lNextStartBlockNo;
             }
 
             return rv;
@@ -806,6 +810,17 @@ namespace Par2NET
 
                 // Process the data
                 rs.Process(blocklength, inputindex, inputbuffer, outputindex, outbuf);
+
+                //using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\outbuf." + inputindex + ".log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
+                //{
+                //    for (int i = 0; i < outbuf.Length; ++i)
+                //    {
+                //        byte b = outbuf[i];
+                //        sw.WriteLine("i={0},b={1}", i, b);
+                //    }
+                //}
+
+                Buffer.BlockCopy(outbuf, 0, outputbuffer, 0, outbuf.Length);
 
                 //if (noiselevel > CommandLine::nlQuiet)
                 //{

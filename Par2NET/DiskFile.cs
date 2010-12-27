@@ -29,6 +29,7 @@ namespace Par2NET
             try
             {
                 File.Move(filename, _filename);
+                filename = _filename;
                 return true;
             }
             catch (Exception)
@@ -192,6 +193,7 @@ namespace Par2NET
             {
                 // Write the data
                 hFile.Write(buffer, (int)start, write);
+                hFile.Flush();
             }
             catch (Exception ex)
             {
