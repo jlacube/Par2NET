@@ -68,31 +68,53 @@ namespace FastGaloisFields
                 // Treat the buffers as arrays of 16-bit Galois values.
                 // Awfully long to execute
 
-            // Create Galois16 inputbuffer
-            Galois16[] inputGalois16 = new Galois16[inputbuffer.Length / 2];
+            //// Create Galois16 inputbuffer
+            //Galois16[] inputGalois16 = new Galois16[inputbuffer.Length / 2];
 
-            // Create Galois16 outputbuffer
-            Galois16[] outputGalois16 = new Galois16[inputGalois16.Length];
+            //// Create Galois16 outputbuffer
+            //Galois16[] outputGalois16 = new Galois16[inputGalois16.Length];
 
-            // Fill Galois16 input buffer with inpuntbuffer values
-            for (int i = 0; i < inputGalois16.Length; ++i)
-            {
-                inputGalois16[i] = (Galois16)(inputbuffer[2*i+1] << 8 | inputbuffer[2*i]);
-                outputGalois16[i] = (Galois16)(outputbuffer[2 * i + 1] << 8 | outputbuffer[2 * i]);
-            }
-
-            // Process the data
-            for (uint i = 0; i < outputGalois16.Length; ++i)
-            {
-                outputGalois16[i] += inputGalois16[i] * factor.Value;
-            }
+            //// Fill Galois16 input buffer with inpuntbuffer values
+            //for (int i = 0; i < inputGalois16.Length; ++i)
+            //{
+            //    inputGalois16[i] = (Galois16)(inputbuffer[2*i+1] << 8 | inputbuffer[2*i]);
+            //    outputGalois16[i] = (Galois16)(outputbuffer[2 * i + 1] << 8 | outputbuffer[2 * i]);
             //}
 
-            // Copy back data from Galois16 output buffer to outputbuffer (byte)
-            for (int i = 0; i < outputGalois16.Length; ++i)
+            //// Process the data
+            //for (uint i = 0; i < outputGalois16.Length; ++i)
+            //{
+            //    outputGalois16[i] += inputGalois16[i] * factor.Value;
+            //}
+            ////}
+
+            //// Copy back data from Galois16 output buffer to outputbuffer (byte)
+            //for (int i = 0; i < outputGalois16.Length; ++i)
+            //{
+            //    outputbuffer[2*i+1] = (byte)(outputGalois16[i].Value >> 8 & 0xFF);
+            //    outputbuffer[2*i] = (byte)(outputGalois16[i].Value & 0xFF);
+            //}
+
+            unsafe
             {
-                outputbuffer[2*i+1] = (byte)(outputGalois16[i].Value >> 8 & 0xFF);
-                outputbuffer[2*i] = (byte)(outputGalois16[i].Value & 0xFF);
+                fixed (byte* pInputBuffer = inputbuffer, pOutputBuffer = outputbuffer)
+                {
+                    UInt16* pInput = (UInt16*)pInputBuffer;
+                    UInt16* pOutput = (UInt16*)pOutputBuffer;
+
+                    for (int i = 0; i < inputbuffer.Length / 2; ++i)
+                    {
+                        Galois16 gInput = *pInput;
+                        Galois16 gOutput = *pOutput;
+
+                        gOutput += gInput * factor.Value;
+
+                        *pOutput = gOutput.Value;
+
+                        ++pInput;
+                        ++pOutput;
+                    }
+                }
             }
 
             return true;

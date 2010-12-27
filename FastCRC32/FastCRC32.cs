@@ -7,7 +7,7 @@ namespace FastCRC32
 {
     public class FastCRC32
     {
-        private uint[] crcTable = new uint[256];
+        private static uint[] crcTable = null;
         private uint[] windowTable = new uint[256];
 
         public uint windowMask = 0;
@@ -23,18 +23,23 @@ namespace FastCRC32
         {
             unchecked
             {
-                uint polynomial = 0xEDB88320;
-
-                for (uint i = 0; i <= 255; i++)
+                if (crcTable == null)
                 {
-                    uint crc = i;
+                    crcTable = new uint[256];
 
-                    for (uint j = 0; j < 8; j++)
+                    uint polynomial = 0xEDB88320;
+
+                    for (uint i = 0; i <= 255; i++)
                     {
-                        crc = (crc >> 1) ^ ((crc & 1) != 0 ? polynomial : 0);
-                    }
+                        uint crc = i;
 
-                    crcTable[i] = crc;
+                        for (uint j = 0; j < 8; j++)
+                        {
+                            crc = (crc >> 1) ^ ((crc & 1) != 0 ? polynomial : 0);
+                        }
+
+                        crcTable[i] = crc;
+                    }
                 }
             }
         }
