@@ -7,7 +7,7 @@ using Par2NET.Packets;
 
 namespace Par2NET
 {
-    public class FileVerification
+    public class FileVerification : IComparable
     {
         public FileDescriptionPacket FileDescriptionPacket = null;
         public FileVerificationPacket FileVerificationPacket = null;
@@ -66,6 +66,16 @@ namespace Par2NET
         internal FileVerificationPacket GetVerificationPacket()
         {
             return FileVerificationPacket;
+        }
+
+        public int CompareTo(object obj)
+        {
+            if (obj == null)
+                return 1;
+
+            FileVerification other = (FileVerification)obj;
+
+            return this.TargetFileName.CompareTo(other.TargetFileName);
         }
     }
 }

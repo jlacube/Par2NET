@@ -26,7 +26,7 @@ namespace Par2NET
             return IndexOf(ByteArrayToSearch, ByteArrayToFind, 0);
         }
 
-        public static int IndexOf(byte[] ByteArrayToSearch, byte[] ByteArrayToFind, int start_index)
+        public static int OldIndexOf(byte[] ByteArrayToSearch, byte[] ByteArrayToFind, int start_index)
         {
             // Any encoding will do, as long as all bytes represent a unique character.
             Encoding encoding = Encoding.GetEncoding(1252);
@@ -34,7 +34,28 @@ namespace Par2NET
             string toSearch = encoding.GetString(ByteArrayToSearch, 0, ByteArrayToSearch.Length);
             string toFind = encoding.GetString(ByteArrayToFind, 0, ByteArrayToFind.Length);
             int result = toSearch.IndexOf(toFind, start_index, StringComparison.Ordinal);
+
             return result;
+        }
+
+        public static int IndexOf(byte[] ByteArrayToSearch, byte[] ByteArrayToFind, int startIndex)
+        {
+            int found = 0;
+            for (int i = startIndex; i < ByteArrayToSearch.Length; i++)
+            {
+                if (ByteArrayToSearch[i] == ByteArrayToFind[found])
+                {
+                    if (++found == ByteArrayToFind.Length)
+                    {
+                        return i - found + 1;
+                    }
+                }
+                else
+                {
+                    found = 0;
+                }
+            }
+            return -1;
         }
 
         public static T ReadStruct<T>(byte[] array, int start, int length)

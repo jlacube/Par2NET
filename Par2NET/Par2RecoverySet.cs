@@ -38,6 +38,8 @@ namespace Par2NET
 
         private Dictionary<uint, FileVerificationEntry> verificationhashtable = new Dictionary<uint, FileVerificationEntry>();
         private Dictionary<uint, FileVerificationEntry> verificationhashtablefull = new Dictionary<uint, FileVerificationEntry>();
+        private List<FileVerificationEntry> expectedblocklist = new List<FileVerificationEntry>();
+        private int expectedblockindex = 0;
 
         static ReedSolomonGalois16     _rs = new ReedSolomonGalois16();                      // The Reed Solomon matrix.
         ReedSolomonGalois16 rs = Par2RecoverySet._rs;
@@ -253,7 +255,7 @@ namespace Par2NET
         {
             MatchType matchType = MatchType.NoMatch;
 
-            FileChecker.CheckFile(fileVer.GetTargetFile(), fileVer.TargetFileName, (int)this.MainPacket.blocksize, fileVer.FileVerificationPacket.entries, fileVer.FileDescriptionPacket.hash16k, fileVer.FileDescriptionPacket.hashfull, ref matchType, verificationhashtablefull, verificationhashtable);
+            FileChecker.CheckFile(fileVer.GetTargetFile(), fileVer.TargetFileName, (int)this.MainPacket.blocksize, fileVer.FileVerificationPacket.entries, fileVer.FileDescriptionPacket.hash16k, fileVer.FileDescriptionPacket.hashfull, ref matchType, verificationhashtablefull, verificationhashtable, expectedblocklist, ref expectedblockindex);
 
             if (matchType == MatchType.FullMatch)
             {
@@ -513,6 +515,7 @@ namespace Par2NET
 
                 // Verify the file again
                 //if (!VerifyDataFile(targetfile, fileVer))
+                expectedblockindex = 0;
                 if (!VerifyDataFile(fileVer))
                     finalresult &= false;
 
@@ -629,7 +632,6 @@ namespace Par2NET
                 while (inputblockindex < inputblocks.Count)
                 {
                     DataBlock inputblock = inputblocks[(int)inputblockindex];
-                    DataBlock copyblock = copyblocks[(int)copyblockindex];
 
                     // Are we reading from a new file?
                     if (lastopenfile != inputblock.GetDiskFile())
@@ -653,8 +655,10 @@ namespace Par2NET
                         return false;
 
                     // Have we reached the last source data block
-                    if (copyblockindex != copyblocks.Count-1)
+                    if (copyblockindex < copyblocks.Count)
                     {
+                        DataBlock copyblock = copyblocks[(int)copyblockindex];
+
                         // Does this block need to be copied to the target file
                         if (copyblock.IsSet())
                         {
@@ -665,8 +669,8 @@ namespace Par2NET
                                 return false;
 
                             totalwritten += wrote;
+                            ++copyblockindex;
                         }
-                        ++copyblockindex;
                     }
 
                     // Function to process things in multiple threads if appropariate
@@ -682,7 +686,7 @@ namespace Par2NET
                 // Reconstruction is not required, we are just copying blocks between files
 
                 // For each block that might need to be copied
-                while (copyblockindex != copyblocks.Count)
+                while (copyblockindex < copyblocks.Count)
                 {
                     DataBlock inputblock = inputblocks[(int)inputblockindex];
                     DataBlock copyblock = copyblocks[(int)copyblockindex];
@@ -744,6 +748,15 @@ namespace Par2NET
             //if (noiselevel > CommandLine::nlQuiet)
             //  cout << "Writing recovered data\r";
 
+            using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\outputbuffer.log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
+            {
+                for (int i = 0; i < outputbuffer.Length; ++i)
+                {
+                    byte b = outputbuffer[i];
+                    sw.WriteLine("i={0},b={1}", i, b);
+                }
+            }
+
             // For each output block that has been recomputed
             for (uint outputindex = 0; outputindex < missingblockcount; outputindex++)
             {
@@ -777,7 +790,8 @@ namespace Par2NET
 
             bool rv = true;		// Optimistic default
 
-            int lNumThreads = Environment.ProcessorCount;
+            //int lNumThreads = Environment.ProcessorCount;
+            int lNumThreads = 1;
 
             // First, establish the number of blocks to be processed by each thread. Of course the last
             // one started might get some less...
@@ -820,7 +834,7 @@ namespace Par2NET
                 //    }
                 //}
 
-                Buffer.BlockCopy(outbuf, 0, outputbuffer, 0, outbuf.Length);
+                Buffer.BlockCopy(outbuf, 0, outputbuffer, (int)(chunksize * outputindex), outbuf.Length);
 
                 //if (noiselevel > CommandLine::nlQuiet)
                 //{
@@ -949,10 +963,13 @@ namespace Par2NET
                 if (!verificationhashtable.ContainsKey(entry.crc))
                     verificationhashtable.Add(entry.crc, entry);
 
-                uint key = (uint)(entry.crc ^ (17 * Path.GetFileName(sourcefile.TargetFileName).GetHashCode()));
+                uint key = (uint)(entry.crc ^ (Path.GetFileName(sourcefile.TargetFileName).GetHashCode()));
 
                 if (!verificationhashtablefull.ContainsKey(key))
+                {
                     verificationhashtablefull.Add(key, entry);
+                    expectedblocklist.Add(entry);
+                }
 
                 ++blocknumber;
                 ++sourceblockindex;

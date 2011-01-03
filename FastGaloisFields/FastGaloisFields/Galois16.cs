@@ -122,7 +122,7 @@ namespace FastGaloisFields
             if (a.Value == 0)
                 return 0;
 
-            int sum = a.table.log[a.Value] * b;
+            int sum = a.table.log[a.Value] * b.Value;
 
             sum = (int)((sum >> (int)a.Bits) + (sum & a.Limit));
             if (sum >= a.Limit) 

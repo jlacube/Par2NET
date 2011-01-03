@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using FastGaloisFields.GaloisTables;
+using System.IO;
 
 namespace FastGaloisFields
 {
@@ -196,6 +197,14 @@ namespace FastGaloisFields
                 database[index] = ibase;
             }
 
+            using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\database.log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
+            {
+                for (int i = 0; i < database.Length; ++i)
+                {
+                    sw.WriteLine("i={0},d={1}", i, database[i]);
+                }
+            }
+
             return true;
         }
 
@@ -276,6 +285,10 @@ namespace FastGaloisFields
             // Allocate the left hand matrix
 
             leftmatrix = new Galois16[outcount * incount];
+            for (int i = 0; i < outcount * incount; ++i)
+            {
+                leftmatrix[i] = new Galois16(0);
+            }
 
             // Allocate the right hand matrix only if we are recovering
 
@@ -283,6 +296,11 @@ namespace FastGaloisFields
             if (datamissing > 0)
             {
                 rightmatrix = new Galois16[outcount * outcount];
+
+                for (int i = 0; i < outcount * outcount; ++i)
+                {
+                    rightmatrix[i] = new Galois16(0);
+                }
             }
 
             // Fill in the two matrices:
@@ -332,8 +350,6 @@ namespace FastGaloisFields
                         rightmatrix[row * outcount + col + datamissing] = 0;
                     }
                 }
-
-                row++;
             }
 
             // One row for each recovery block being computed
@@ -385,6 +401,24 @@ namespace FastGaloisFields
                 row++;
             }
 
+            using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\leftmatrix.before.gauss.log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
+            {
+                for (int i = 0; i < leftmatrix.Length; ++i)
+                {
+                    Galois16 g = leftmatrix[i];
+                    sw.WriteLine("i={0},g={1}", i, g.Value);
+                }
+            }
+
+            using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\rightmatrix.before.gauss.log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
+            {
+                for (int i = 0; i < rightmatrix.Length; ++i)
+                {
+                    Galois16 g = rightmatrix[i];
+                    sw.WriteLine("i={0},g={1}", i, g.Value);
+                }
+            }
+
             //if (noiselevel > CommandLine::nlQuiet)
             //  cout << "Constructing: done." << endl;
 
@@ -397,6 +431,24 @@ namespace FastGaloisFields
                 bool success = ReedSolomon.GaussElim(outcount, incount, leftmatrix, rightmatrix, datamissing);
                 //return success;
             }
+
+            //using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\leftmatrix.after.gauss.log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
+            //{
+            //    for (int i = 0; i < leftmatrix.Length; ++i)
+            //    {
+            //        Galois16 g = leftmatrix[i];
+            //        sw.WriteLine("i={0},g={1}", i, g.Value);
+            //    }
+            //}
+
+            //using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\rightmatrix.after.gauss.log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
+            //{
+            //    for (int i = 0; i < rightmatrix.Length; ++i)
+            //    {
+            //        Galois16 g = rightmatrix[i];
+            //        sw.WriteLine("i={0},g={1}", i, g.Value);
+            //    }
+            //}
 
             return true;
         }

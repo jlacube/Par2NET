@@ -56,7 +56,7 @@ namespace Par2NET
             }
         }
 
-        public static void CheckFile(DiskFile diskFile, string filename, int blocksize, List<FileVerificationEntry> fileVerEntry, byte[] md5hash16k, byte[] md5hash, ref MatchType matchType, Dictionary<uint,FileVerificationEntry> hashfull, Dictionary<uint,FileVerificationEntry> hash)
+        public static void CheckFile(DiskFile diskFile, string filename, int blocksize, List<FileVerificationEntry> fileVerEntry, byte[] md5hash16k, byte[] md5hash, ref MatchType matchType, Dictionary<uint,FileVerificationEntry> hashfull, Dictionary<uint,FileVerificationEntry> hash, List<FileVerificationEntry> expectedList, ref int expectedIndex)
         {
             //TODO : Maybe rewrite in TPL for slide calculation
             //TODO : Maybe search against all sourcefiles (case of misnamed files)
@@ -64,6 +64,7 @@ namespace Par2NET
             matchType = MatchType.FullMatch;
 
             ulong _offset = 0;
+            bool stop = false;
 
             using (BinaryReader br = new BinaryReader(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read, 2*blocksize)))
             {
@@ -71,7 +72,7 @@ namespace Par2NET
                 MD5 md5Hasher = MD5.Create();
                 FastCRC32.FastCRC32 crc32 = new FastCRC32.FastCRC32((ulong)blocksize);
 
-                uint partial_key = (uint)(17 * Path.GetFileName(filename).GetHashCode());
+                uint partial_key = (uint)(Path.GetFileName(filename).GetHashCode());
 
                 long length = br.BaseStream.Length;
                 Stream baseStream = br.BaseStream;
@@ -107,37 +108,51 @@ namespace Par2NET
 
                         stepping = false;
 
-                        FileVerificationEntry entry = null;
+                        FileVerificationEntry entry = expectedList[expectedIndex > expectedList.Count ? expectedList.Count -1 : expectedIndex];
 
-                        uint key = crc32Value ^ partial_key;
+                        if (entry.crc != crc32Value)
+                        {
+                            entry = null;
 
-                        if (hashfull.ContainsKey(key))
-                        {
-                            entry = hashfull[key];
-                        }
-                        else
-                        {
-                            if (hash.ContainsKey(crc32Value))
-                                entry = hash[crc32Value];
+                            uint key = crc32Value ^ partial_key;
+
+                            if (hashfull.ContainsKey(key))
+                            {
+                                entry = hashfull[key];
+                            }
+                            else
+                            {
+                                if (hash.ContainsKey(crc32Value))
+                                    entry = hash[crc32Value];
+                            }
                         }
 
                         if (entry != null)
                         {
-                            // We found a complete match, so go to next block !
+                            byte[] blockhash = md5Hasher.ComputeHash(buffer, offset, blocksize);
 
-                            //TODO : correct offset counter for last block
-                            Console.WriteLine("block found at offset {0}, crc {1}", _offset, entry.crc);
+                            if (ToolKit.ToHex(blockhash) == ToolKit.ToHex(entry.hash))
+                            {
+                                // We found a complete match, so go to next block !
 
-                            //TODO: Pbm DiskFile need to be uniq and given as param for CheckFile methods, need rewrite based on //bool Par2Repairer::VerifyFilesInVerifyList()// code
-                            entry.SetBlock(diskFile, (int)(_offset));
+                                Console.WriteLine("block found at offset {0}, crc {1}", _offset, entry.crc);
 
-                            offset += blocksize;
-                            _offset += (ulong)blocksize;
+                                entry.SetBlock(diskFile, (int)(_offset));
+
+                                offset += blocksize;
+                                _offset += (ulong)blocksize;
+
+                                expectedIndex = expectedList.IndexOf(entry) + 1;
+                            }
                         }
                         else
                         {
-                            if (baseStream.Position == length)
-                                break;
+                            if (baseStream.Position == length && (int)_offset > length)
+                            {
+                                int i = 8;
+                                int j = 2 * i;
+                                //break;
+                            }
                             else
                             {
                                 matchType = MatchType.PartialMatch;
@@ -153,6 +168,13 @@ namespace Par2NET
 
                         if (offset >= blocksize)
                         {
+                            if (baseStream.Position == length)
+                            {
+                                int i = 8;
+                                int j = 2 * i;
+                                //break;
+                            }
+
                             byte[] newBuffer = new byte[buffer.Length];
                             Buffer.BlockCopy(buffer, offset, newBuffer, 0, 2 * blocksize - offset);
 
@@ -163,6 +185,12 @@ namespace Par2NET
                             offset = 0;
                             
                             buffer = newBuffer;
+
+                            if (stop)
+                                break;
+
+                            if (readBytes.Length == 0)
+                                stop = true;
                         }
 
                     } while (offset < 2*blocksize); // Stop condition : When index is equal to blocksize, end of sliding buffer is reached, so we have to read from file

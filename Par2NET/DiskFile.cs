@@ -108,6 +108,7 @@ namespace Par2NET
             if (IsOpen())
             {
                 hFile.Close();
+                hFile = null;
             }
         }
 
