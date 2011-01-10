@@ -197,13 +197,13 @@ namespace FastGaloisFields
                 database[index] = ibase;
             }
 
-            using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\database.log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
-            {
-                for (int i = 0; i < database.Length; ++i)
-                {
-                    sw.WriteLine("i={0},d={1}", i, database[i]);
-                }
-            }
+            //using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\database.log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
+            //{
+            //    for (int i = 0; i < database.Length; ++i)
+            //    {
+            //        sw.WriteLine("i={0},d={1}", i, database[i]);
+            //    }
+            //}
 
             return true;
         }
@@ -401,23 +401,23 @@ namespace FastGaloisFields
                 row++;
             }
 
-            using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\leftmatrix.before.gauss.log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
-            {
-                for (int i = 0; i < leftmatrix.Length; ++i)
-                {
-                    Galois16 g = leftmatrix[i];
-                    sw.WriteLine("i={0},g={1}", i, g.Value);
-                }
-            }
+            //using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\leftmatrix.before.gauss.log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
+            //{
+            //    for (int i = 0; i < leftmatrix.Length; ++i)
+            //    {
+            //        Galois16 g = leftmatrix[i];
+            //        sw.WriteLine("i={0},g={1}", i, g.Value);
+            //    }
+            //}
 
-            using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\rightmatrix.before.gauss.log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
-            {
-                for (int i = 0; i < rightmatrix.Length; ++i)
-                {
-                    Galois16 g = rightmatrix[i];
-                    sw.WriteLine("i={0},g={1}", i, g.Value);
-                }
-            }
+            //using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\rightmatrix.before.gauss.log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
+            //{
+            //    for (int i = 0; i < rightmatrix.Length; ++i)
+            //    {
+            //        Galois16 g = rightmatrix[i];
+            //        sw.WriteLine("i={0},g={1}", i, g.Value);
+            //    }
+            //}
 
             //if (noiselevel > CommandLine::nlQuiet)
             //  cout << "Constructing: done." << endl;

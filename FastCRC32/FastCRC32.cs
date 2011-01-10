@@ -7,57 +7,84 @@ namespace FastCRC32
 {
     public class FastCRC32
     {
-        private static uint[] crcTable = null;
-        private uint[] windowTable = new uint[256];
+        private readonly static uint[] crcTable = null;
+        private static uint[] windowTable = null;
 
         public uint windowMask = 0;
 
+        static FastCRC32()
+        {
+            unchecked
+            {
+                crcTable = new uint[256];
+
+                uint polynomial = 0xEDB88320;
+
+                for (uint i = 0; i <= 255; i++)
+                {
+                    uint crc = i;
+
+                    for (uint j = 0; j < 8; j++)
+                    {
+                        crc = (crc >> 1) ^ ((crc & 1) != 0 ? polynomial : 0);
+                    }
+
+                    crcTable[i] = crc;
+                }
+            }
+        }
+
         public FastCRC32(ulong window)
         {
-            GenerateCRC32Table();
+            //GenerateCRC32Table();
             GenerateWindowTable(window);
             windowMask = ComputeWindowMask(window);
         }
 
         private void GenerateCRC32Table()
         {
-            unchecked
-            {
-                if (crcTable == null)
-                {
-                    crcTable = new uint[256];
+            //unchecked
+            //{
+            //    if (crcTable == null)
+            //    {
+            //        crcTable = new uint[256];
 
-                    uint polynomial = 0xEDB88320;
+            //        uint polynomial = 0xEDB88320;
 
-                    for (uint i = 0; i <= 255; i++)
-                    {
-                        uint crc = i;
+            //        for (uint i = 0; i <= 255; i++)
+            //        {
+            //            uint crc = i;
 
-                        for (uint j = 0; j < 8; j++)
-                        {
-                            crc = (crc >> 1) ^ ((crc & 1) != 0 ? polynomial : 0);
-                        }
+            //            for (uint j = 0; j < 8; j++)
+            //            {
+            //                crc = (crc >> 1) ^ ((crc & 1) != 0 ? polynomial : 0);
+            //            }
 
-                        crcTable[i] = crc;
-                    }
-                }
-            }
+            //            crcTable[i] = crc;
+            //        }
+            //    }
+            //}
         }
 
         private void GenerateWindowTable(ulong window)
         {
             unchecked
             {
-                for (uint i = 0; i <= 255; i++)
+                if (windowTable == null)
                 {
-                    uint crc = crcTable[i];
+                    windowTable = new uint[256];
 
-                    for (uint j = 0; j < window; j++)
+                    for (uint i = 0; i <= 255; i++)
                     {
-                        crc = ((crc >> 8) & 0x00ffffff) ^ crcTable[(byte)crc];
-                    }
+                        uint crc = crcTable[i];
 
-                    windowTable[i] = crc;
+                        for (uint j = 0; j < window; j++)
+                        {
+                            crc = ((crc >> 8) & 0x00ffffff) ^ crcTable[(byte)crc];
+                        }
+
+                        windowTable[i] = crc;
+                    }
                 }
             }
         }

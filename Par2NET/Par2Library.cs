@@ -10,6 +10,7 @@ using System.IO;
 using System.Globalization;
 using System.Security.Cryptography;
 using Par2NET.Interfaces;
+using System.Threading;
 
 namespace Par2NET
 {
@@ -86,6 +87,8 @@ namespace Par2NET
 
     public class Par2Library
     {
+        public bool multithread = false;
+
         private static string targetPath = string.Empty;
         private static NoiseLevel noiseLevel = NoiseLevel.Normal;
         private static bool searchAllExtMisNamedFiles = false;
@@ -115,17 +118,27 @@ namespace Par2NET
             return par1Library;
         }
 
+        public Par2Library(bool _multithread)
+        {
+            multithread = _multithread;
+        }
+
         private Dictionary<string, Par2RecoverySet> setids = new Dictionary<string, Par2RecoverySet>();
+
+        private static object syncObject = new object();
 
         private void UpdateOrAddRecoverySet(Par2RecoverySet recoverySet)
         {
-            string setid = ToolKit.ToHex(recoverySet.MainPacket.header.setid);
-
-            if (!setids.Keys.Contains(setid))
-                setids.Add(setid, recoverySet);
-            else
+            lock (syncObject)
             {
-                UpdateRecoverySet(setids[setid], recoverySet);
+                string setid = ToolKit.ToHex(recoverySet.MainPacket.header.setid);
+
+                if (!setids.Keys.Contains(setid))
+                    setids.Add(setid, recoverySet);
+                else
+                {
+                    UpdateRecoverySet(setids[setid], recoverySet);
+                }
             }
         }
 
@@ -283,7 +296,7 @@ namespace Par2NET
                 if (!setids[setid].VerifyTargetFiles())
                 {
                     // Delete all of the partly reconstructed files
-                    setids[setid].DeleteIncompleteTargetFiles();
+                    //setids[setid].DeleteIncompleteTargetFiles();
                     return ParResult.FileIOError;
                 }
             }
@@ -317,14 +330,47 @@ namespace Par2NET
 
             try
             {
-                foreach (string recoveryFile in recoveryFiles)
+                //if (!multithread)
+                if (false)
                 {
-                    Par2FileReader reader = new Par2FileReader(recoveryFile);
-                    UpdateOrAddRecoverySet(reader.ReadRecoverySet());
+                    //ST
+                    foreach (string recoveryFile in recoveryFiles)
+                    {
+                        Par2FileReader reader = new Par2FileReader(recoveryFile, multithread);
+                        UpdateOrAddRecoverySet(reader.ReadRecoverySet());
+                    }
+                }
+                else
+                {
+                    //MT : OK
+                    using (SemaphoreSlim concurrencySemaphore = new SemaphoreSlim(4))
+                    {
+                        List<Task> tasks = new List<Task>();
+                        foreach (string recoveryFile in recoveryFiles)
+                        {
+                            concurrencySemaphore.Wait();
+                            tasks.Add(Task.Factory.StartNew((f) =>
+                            {
+                                try
+                                {
+                                    string file = (string)f;
+                                    Par2FileReader reader = new Par2FileReader(file, multithread);
+                                    UpdateOrAddRecoverySet(reader.ReadRecoverySet());
+                                }
+                                finally
+                                {
+                                    concurrencySemaphore.Release();
+                                }
+                            }, recoveryFile));
+                        }
+
+                        Task.WaitAll(tasks.ToArray());
+                    }                   
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Console.WriteLine(ex);
                 return ParResult.LogicError;
             }
 

@@ -45,6 +45,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BinaryStreamReader.cs" />
+    <Compile Include="SingletonProvider.cs" />
     <Compile Include="DiskFile.cs" />
     <Compile Include="FileChecker.cs" />
     <Compile Include="FileVerification.cs" />

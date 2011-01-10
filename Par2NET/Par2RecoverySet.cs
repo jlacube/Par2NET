@@ -6,11 +6,15 @@ using System.Text;
 using Par2NET.Packets;
 using System.IO;
 using FastGaloisFields;
+using System.Threading.Tasks;
+using System.Threading;
 
 namespace Par2NET
 {
     public class Par2RecoverySet
     {
+        private bool multithread = false;
+
         public CreatorPacket CreatorPacket = null;
         public MainPacket MainPacket = null;
         public List<RecoveryPacket> RecoveryPackets = new List<RecoveryPacket>();
@@ -43,6 +47,11 @@ namespace Par2NET
 
         static ReedSolomonGalois16     _rs = new ReedSolomonGalois16();                      // The Reed Solomon matrix.
         ReedSolomonGalois16 rs = Par2RecoverySet._rs;
+
+        public Par2RecoverySet(bool _multithread)
+        {
+            multithread = _multithread;
+        }
 
         private List<FileVerification> verifylist = new List<FileVerification>();
 
@@ -188,25 +197,67 @@ namespace Par2NET
             {
                 bool result = true;
 
-                foreach (FileVerification fileVer in SourceFiles)
+                if (!multithread)
                 {
-                    if (!File.Exists(fileVer.TargetFileName))
-                        continue;
+                    //ST
+                    foreach (FileVerification fileVer in SourceFiles)
+                    {
+                        if (!File.Exists(fileVer.TargetFileName))
+                            continue;
 
-                    // Yes. Record that fact.
-                    fileVer.SetTargetExists(true);
+                        // Yes. Record that fact.
+                        fileVer.SetTargetExists(true);
 
-                    // Remember that the DiskFile is the target file
-                    fileVer.SetTargetFile(new DiskFile(fileVer.TargetFileName));
+                        // Remember that the DiskFile is the target file
+                        fileVer.SetTargetFile(new DiskFile(fileVer.TargetFileName));
 
-                    result &= (VerifyFile(fileVer) != null);
-                        
-                }   
+                        result &= (VerifyFile(fileVer) != null);
+
+                    }
+                }
+                else
+                {
+                    //MT : OK
+                    using (SemaphoreSlim concurrencySemaphore = new SemaphoreSlim(2))
+                    {
+                        List<Task> tasks = new List<Task>();
+                        foreach (FileVerification fileVer in SourceFiles)
+                        {
+                            if (!File.Exists(fileVer.TargetFileName))
+                                continue;
+
+                            concurrencySemaphore.Wait();
+
+                            tasks.Add(Task.Factory.StartNew(
+                                (f) =>
+                                {
+                                    try
+                                    {
+                                        FileVerification file = (FileVerification)f;
+                                        // Yes. Record that fact.
+                                        file.SetTargetExists(true);
+
+                                        // Remember that the DiskFile is the target file
+                                        file.SetTargetFile(new DiskFile(file.TargetFileName));
+
+                                        VerifyFile(file);
+                                    }
+                                    finally
+                                    {
+                                        concurrencySemaphore.Release();
+                                    }
+                                }, fileVer));
+                        }
+
+                        Task.WaitAll(tasks.ToArray());
+                    }
+                }
 
                 return result;
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine(ex);
                 return false;
             }
         }
@@ -489,41 +540,103 @@ namespace Par2NET
             // Verify the target files in alphabetical order
             verifylist.Sort();
 
-	        foreach( FileVerification fileVer in verifylist)
+            if (!multithread)
             {
-                DiskFile targetfile = fileVer.GetTargetFile();
+                //ST
+                foreach (FileVerification fileVer in verifylist)
+                {
+                    DiskFile targetfile = fileVer.GetTargetFile();
 
-                // Close the file
-                if (targetfile.IsOpen())
+                    // Close the file
+                    if (targetfile.IsOpen())
+                        targetfile.Close();
+
+                    // Mark all data blocks for the file as unknown
+                    foreach (DataBlock db in fileVer.SourceBlocks)
+                    {
+                        db.ClearLocation();
+                    }
+
+                    // Say we don't have a complete version of the file
+                    fileVer.SetCompleteFile(null);
+
+                    // Re-open the target file
+                    if (!targetfile.Open())
+                    {
+                        finalresult &= false;
+                        continue;
+                    }
+
+                    // Verify the file again
+                    //if (!VerifyDataFile(targetfile, fileVer))
+                    expectedblockindex = 0;
+                    if (!VerifyDataFile(fileVer))
+                        finalresult &= false;
+
+                    // Close the file again
                     targetfile.Close();
 
-                // Mark all data blocks for the file as unknown
-                foreach (DataBlock db in fileVer.SourceBlocks)
+                    // Find out how much data we have found
+                    UpdateVerificationResults();
+                }
+            }
+            else
+            {
+                //MT : OK
+                List<Task<bool>> tasks = new List<Task<bool>>();
+                foreach (FileVerification fileVer in verifylist)
                 {
-                    db.ClearLocation();
+                    tasks.Add(Task.Factory.StartNew<bool>((f) =>
+                    {
+                        bool result = true;
+
+                        FileVerification file = (FileVerification)f;
+
+                        DiskFile targetfile = file.GetTargetFile();
+
+                        // Close the file
+                        if (targetfile.IsOpen())
+                            targetfile.Close();
+
+                        // Mark all data blocks for the file as unknown
+                        foreach (DataBlock db in file.SourceBlocks)
+                        {
+                            db.ClearLocation();
+                        }
+
+                        // Say we don't have a complete version of the file
+                        file.SetCompleteFile(null);
+
+                        // Re-open the target file
+                        if (!targetfile.Open())
+                        {
+                            result &= false;
+                            return result;
+                        }
+
+                        // Verify the file again
+                        //if (!VerifyDataFile(targetfile, fileVer))
+                        expectedblockindex = 0;
+                        if (!VerifyDataFile(file))
+                            result &= false;
+
+                        // Close the file again
+                        targetfile.Close();
+
+                        // Find out how much data we have found
+                        //UpdateVerificationResults();
+                        return result;
+                    }, fileVer));
                 }
 
-                // Say we don't have a complete version of the file
-                fileVer.SetCompleteFile(null);
+                Task.WaitAll(tasks.ToArray());
 
-                // Re-open the target file
-                if (!targetfile.Open())
-                {
-                    finalresult &= false;
-                    continue;
-                }
-
-                // Verify the file again
-                //if (!VerifyDataFile(targetfile, fileVer))
-                expectedblockindex = 0;
-                if (!VerifyDataFile(fileVer))
-                    finalresult &= false;
-
-                // Close the file again
-                targetfile.Close();
-
-                // Find out how much data we have found
                 UpdateVerificationResults();
+
+                foreach (Task<bool> t in tasks)
+                {
+                    finalresult &= t.Result;
+                }
             }
 
             return finalresult;
@@ -748,14 +861,14 @@ namespace Par2NET
             //if (noiselevel > CommandLine::nlQuiet)
             //  cout << "Writing recovered data\r";
 
-            using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\outputbuffer.log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
-            {
-                for (int i = 0; i < outputbuffer.Length; ++i)
-                {
-                    byte b = outputbuffer[i];
-                    sw.WriteLine("i={0},b={1}", i, b);
-                }
-            }
+            //using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\outputbuffer.log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
+            //{
+            //    for (int i = 0; i < outputbuffer.Length; ++i)
+            //    {
+            //        byte b = outputbuffer[i];
+            //        sw.WriteLine("i={0},b={1}", i, b);
+            //    }
+            //}
 
             // For each output block that has been recomputed
             for (uint outputindex = 0; outputindex < missingblockcount; outputindex++)
@@ -790,27 +903,46 @@ namespace Par2NET
 
             bool rv = true;		// Optimistic default
 
-            //int lNumThreads = Environment.ProcessorCount;
-            int lNumThreads = 1;
+            int lNumThreads = Environment.ProcessorCount;
+            //int lNumThreads = 2;
 
             // First, establish the number of blocks to be processed by each thread. Of course the last
             // one started might get some less...
             int lNumBlocksPerThread = (int)(missingblockcount - 1) / lNumThreads + 1;		// Round up
             uint lCurrentStartBlockNo = 0;
 
+            List<Task> tasks = new List<Task>();
+
             while (lCurrentStartBlockNo < missingblockcount)
             {
                 uint lNextStartBlockNo = (uint)(lCurrentStartBlockNo + lNumBlocksPerThread);
                 if (lNextStartBlockNo > missingblockcount)
-                    lNextStartBlockNo = missingblockcount;		// Constrain
+                    lNextStartBlockNo = missingblockcount;		// Constraint
 
-                RepairMissingBlockRange(blocklength, inputindex, lCurrentStartBlockNo, lNextStartBlockNo);
+                //MT : OK
+                object[] args = new object[] { blocklength, inputindex, lCurrentStartBlockNo, lNextStartBlockNo };
+                tasks.Add(Task.Factory.StartNew((a) => 
+                {
+                    object[] list = (object[])a;
+                    uint bl = (uint)list[0];
+                    uint ii = (uint)list[1];
+                    uint csb = (uint)list[2];
+                    uint nsb = (uint)list[3];
+                    RepairMissingBlockRange(bl, ii, csb, nsb); 
+                }, args, TaskCreationOptions.LongRunning));
+                
+                //ST
+                //RepairMissingBlockRange(blocklength, inputindex, lCurrentStartBlockNo, lNextStartBlockNo);
 
                 lCurrentStartBlockNo = lNextStartBlockNo;
             }
 
+            Task.WaitAll(tasks.ToArray());
+
             return rv;
         }
+
+        private static object _syncObject = new object();
 
         private void RepairMissingBlockRange(uint blocklength, uint inputindex, uint aStartBlockNo, uint aEndBlockNo)
         {
@@ -820,7 +952,10 @@ namespace Par2NET
             {
                 // Select the appropriate part of the output buffer
                 byte[] outbuf = new byte[blocklength];
-                Buffer.BlockCopy(outputbuffer, (int)(chunksize * outputindex), outbuf, 0, outbuf.Length);
+                //lock (_syncObject)
+                {
+                    Buffer.BlockCopy(outputbuffer, (int)(chunksize * outputindex), outbuf, 0, outbuf.Length);
+                }
 
                 // Process the data
                 rs.Process(blocklength, inputindex, inputbuffer, outputindex, outbuf);
@@ -834,7 +969,10 @@ namespace Par2NET
                 //    }
                 //}
 
-                Buffer.BlockCopy(outbuf, 0, outputbuffer, (int)(chunksize * outputindex), outbuf.Length);
+               // lock (_syncObject)
+                {
+                    Buffer.BlockCopy(outbuf, 0, outputbuffer, (int)(chunksize * outputindex), outbuf.Length);
+                }
 
                 //if (noiselevel > CommandLine::nlQuiet)
                 //{

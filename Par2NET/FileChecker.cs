@@ -56,6 +56,10 @@ namespace Par2NET
             }
         }
 
+        private static object _syncObject = new object();
+
+        private static object _readerSyncObject = new object();
+
         public static void CheckFile(DiskFile diskFile, string filename, int blocksize, List<FileVerificationEntry> fileVerEntry, byte[] md5hash16k, byte[] md5hash, ref MatchType matchType, Dictionary<uint,FileVerificationEntry> hashfull, Dictionary<uint,FileVerificationEntry> hash, List<FileVerificationEntry> expectedList, ref int expectedIndex)
         {
             //TODO : Maybe rewrite in TPL for slide calculation
@@ -66,7 +70,11 @@ namespace Par2NET
             ulong _offset = 0;
             bool stop = false;
 
-            using (BinaryReader br = new BinaryReader(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read, 2*blocksize)))
+            Console.WriteLine("Checking file '{0}'", Path.GetFileName(filename));
+
+            //using (BinaryReader br = new BinaryReader(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read, 2*blocksize)))
+            //using (BinaryReader br = new BinaryReader(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read, 10*1024*1024, FileOptions.SequentialScan)))
+            using (BinaryReader br = new BinaryReader(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read)))
             {
                 CRC32NET.CRC32 crc32Hasher = new CRC32NET.CRC32();
                 MD5 md5Hasher = MD5.Create();
@@ -76,12 +84,20 @@ namespace Par2NET
 
                 long length = br.BaseStream.Length;
                 Stream baseStream = br.BaseStream;
+
+                if (length < blocksize)
+                    blocksize = (int)length;
+
                 while (baseStream.Position < length)
                 {
                     int nbRead = Math.Min((2 * blocksize), (int)(length - baseStream.Position));
 
-                    // Prepare buffer
-                    byte[] buffer = br.ReadBytes(nbRead);
+                    byte[] buffer = null;
+                    //lock (_readerSyncObject)
+                    //{
+                        // Prepare buffer
+                        buffer = br.ReadBytes(nbRead);
+                    //}
                     int offset = 0;
 
                     bool stepping = false;
@@ -108,7 +124,12 @@ namespace Par2NET
 
                         stepping = false;
 
-                        FileVerificationEntry entry = expectedList[expectedIndex > expectedList.Count ? expectedList.Count -1 : expectedIndex];
+                        FileVerificationEntry entry = null;
+
+                        lock (_syncObject)
+                        {
+                            entry = expectedList[expectedIndex > expectedList.Count-1 ? expectedList.Count - 1 : expectedIndex];
+                        }
 
                         if (entry.crc != crc32Value)
                         {
@@ -135,14 +156,17 @@ namespace Par2NET
                             {
                                 // We found a complete match, so go to next block !
 
-                                Console.WriteLine("block found at offset {0}, crc {1}", _offset, entry.crc);
+                                //Console.WriteLine("block found at offset {0}, crc {1}", _offset, entry.crc);
 
                                 entry.SetBlock(diskFile, (int)(_offset));
 
                                 offset += blocksize;
                                 _offset += (ulong)blocksize;
 
-                                expectedIndex = expectedList.IndexOf(entry) + 1;
+                                lock (_syncObject)
+                                {
+                                    expectedIndex = expectedList.IndexOf(entry) + 1;
+                                }
                             }
                         }
                         else
@@ -178,7 +202,12 @@ namespace Par2NET
                             byte[] newBuffer = new byte[buffer.Length];
                             Buffer.BlockCopy(buffer, offset, newBuffer, 0, 2 * blocksize - offset);
 
-                            byte[] readBytes = br.ReadBytes(Math.Min(offset, (int)(length - baseStream.Position)));
+                            byte[] readBytes = null;
+
+                            //lock (_readerSyncObject)
+                            //{
+                                readBytes = br.ReadBytes(Math.Min(offset, (int)(length - baseStream.Position)));
+                            //}
 
                             Buffer.BlockCopy(readBytes, 0, newBuffer, 2 * blocksize - offset, readBytes.Length);
 

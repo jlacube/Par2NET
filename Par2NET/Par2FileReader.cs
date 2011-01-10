@@ -23,10 +23,10 @@ namespace Par2NET
         Par2RecoverySet par2RecoverySet;
         FileInfo fileInfo;
 
-        private Par2FileReader(Stream stream)
+        private Par2FileReader(Stream stream, bool multithread)
             : base(stream)
         {
-            par2RecoverySet = new Par2RecoverySet();
+            par2RecoverySet = new Par2RecoverySet(multithread);
 
             packet_magic = ToolKit.InitByteArrayFromChars('P', 'A', 'R', '2', '\0', 'P', 'K', 'T');
             fileverificationpacket_type = ToolKit.InitByteArrayFromChars('P', 'A', 'R', ' ', '2', '.', '0', '\0', 'I', 'F', 'S', 'C', '\0', '\0', '\0', '\0');
@@ -36,8 +36,8 @@ namespace Par2NET
             creatorpacket_type = ToolKit.InitByteArrayFromChars('P', 'A', 'R', ' ', '2', '.', '0', '\0', 'C', 'r', 'e', 'a', 't', 'o', 'r', '\0');
         }
 
-        public Par2FileReader(string filename)
-            : this(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read))
+        public Par2FileReader(string filename, bool multithread)
+            : this(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read), multithread)
         {
             fileInfo = new FileInfo(filename);
         }

@@ -8,22 +8,66 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Runtime.InteropServices;
 
+using CommandLine;
+
 namespace Par2NET.Console
 {
+    //        [Argument(ArgumentType.AtMostOnce, HelpText = "Count number of lines in the input text.")]
+    //        public bool lines;
+    //        [Argument(ArgumentType.AtMostOnce, HelpText="Count number of words in the input text.")]
+    //        public bool words;
+    //        [Argument(ArgumentType.AtMostOnce, HelpText="Count number of chars in the input text.")]
+    //        public bool chars;
+    //        [DefaultArgument(ArgumentType.MultipleUnique, HelpText="Input files to count.")]
+    //        public string[] files;
+
+    public class ProgramArguments
+    {
+        [Argument(ArgumentType.AtMostOnce, HelpText = "MultiThread switch", ShortName = "mt", LongName = "multithread", DefaultValue = true)]
+        public bool multithread;
+        [Argument(ArgumentType.AtMostOnce, HelpText = "PAR library version", ShortName = "v", LongName = "version", DefaultValue = ParVersion.Par2)]
+        public ParVersion version;
+        [Argument(ArgumentType.AtMostOnce, HelpText = "PAR library action to perform", ShortName = "a", LongName = "action", DefaultValue = ParAction.ParVerify)]
+        public ParAction action;
+        [Argument(ArgumentType.AtMostOnce, HelpText = "Output target directory", ShortName = "o", LongName = "outputPath", DefaultValue = "")]
+        public string targetPath;
+        [Argument(ArgumentType.MultipleUnique, HelpText = "Specific input files", ShortName = "if", LongName = "inputFile", DefaultValue = new string[] { })]
+        public string[] inputFiles;
+        [Argument(ArgumentType.MultipleUnique | ArgumentType.Required, HelpText = "Specific recorvery files", ShortName = "rf", LongName = "recoveryFile", DefaultValue = new string[] { })]
+        public string[] recoveryFiles;
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            Par2Library library = new Par2Library();
-            List<string> inputFiles = new List<string>();
-            List<string> recoveryFiles = new List<string>();
+            ProgramArguments _args = new ProgramArguments();
 
+            if (!Parser.ParseArgumentsWithUsage(args, _args))
+                return;
+
+            Par2Library library = new Par2Library(_args.multithread);
+
+            List<string> inputFiles = new List<string>(_args.inputFiles);
+            List<string> recoveryFiles = new List<string>(_args.recoveryFiles);
+
+            if (string.IsNullOrEmpty(_args.targetPath))
+                _args.targetPath = Path.GetDirectoryName(_args.recoveryFiles[0]);
+
+            DateTime startTime = DateTime.Now;
+            ParResult result = library.Process(_args.version, inputFiles, recoveryFiles, _args.action, _args.targetPath);
+            DateTime endTime = DateTime.Now;
+            TimeSpan duration = endTime - startTime;
+
+            System.Console.WriteLine("Duration : {0}h{1}m{2}s{3}ms", duration.Hours, duration.Minutes, duration.Seconds, duration.Milliseconds);
+
+            System.Console.WriteLine("Par2NET result : {0}", result.ToString());
             //recoveryFiles.Add(@"C:\USERS\Projects\__Perso\Par2NET\Par2NET\Tests\EntLib50.vol10+10.PAR2");
             //recoveryFiles.Add(@"C:\Documents and Settings\Jerome\My Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\EntLib50.vol10+10.PAR2");
-            recoveryFiles.Add(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\EntLib50.vol10+10.PAR2");
+            //recoveryFiles.Add(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\EntLib50.vol10+10.PAR2");
 
             //ParResult result = library.Process(ParVersion.Par2, inputFiles, recoveryFiles, ParAction.ParVerify, @"C:\Documents and Settings\Jerome\My Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests");
-            ParResult result = library.Process(ParVersion.Par2, inputFiles, recoveryFiles, ParAction.ParRepair, @"C:\Documents and Settings\Jerome\My Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests");
+            //ParResult result = library.Process(ParVersion.Par2, inputFiles, recoveryFiles, ParAction.ParRepair, @"C:\Documents and Settings\Jerome\My Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests");
         }
 
         //static void Main(string[] args)
