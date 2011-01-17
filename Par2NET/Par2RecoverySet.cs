@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 
 using Par2NET.Packets;
+using Par2NET.Interfaces;
 using System.IO;
 using FastGaloisFields;
 using System.Threading.Tasks;
@@ -306,7 +307,7 @@ namespace Par2NET
         {
             MatchType matchType = MatchType.NoMatch;
 
-            FileChecker.CheckFile(fileVer.GetTargetFile(), fileVer.TargetFileName, (int)this.MainPacket.blocksize, fileVer.FileVerificationPacket.entries, fileVer.FileDescriptionPacket.hash16k, fileVer.FileDescriptionPacket.hashfull, ref matchType, verificationhashtablefull, verificationhashtable, expectedblocklist, ref expectedblockindex);
+            NewFileChecker.CheckFile(fileVer.GetTargetFile(), fileVer.TargetFileName, (int)this.MainPacket.blocksize, fileVer.FileVerificationPacket.entries, fileVer.FileDescriptionPacket.hash16k, fileVer.FileDescriptionPacket.hashfull, ref matchType, verificationhashtablefull, verificationhashtable, expectedblocklist, ref expectedblockindex, this.multithread);
 
             if (matchType == MatchType.FullMatch)
             {
@@ -861,14 +862,9 @@ namespace Par2NET
             //if (noiselevel > CommandLine::nlQuiet)
             //  cout << "Writing recovered data\r";
 
-            //using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\outputbuffer.log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
-            //{
-            //    for (int i = 0; i < outputbuffer.Length; ++i)
-            //    {
-            //        byte b = outputbuffer[i];
-            //        sw.WriteLine("i={0},b={1}", i, b);
-            //    }
-            //}
+#if TRACE
+            ToolKit.LogArrayToFile<byte>("outputbuffer.log", outputbuffer);
+#endif
 
             // For each output block that has been recomputed
             for (uint outputindex = 0; outputindex < missingblockcount; outputindex++)
@@ -959,6 +955,10 @@ namespace Par2NET
 
                 // Process the data
                 rs.Process(blocklength, inputindex, inputbuffer, outputindex, outbuf);
+
+#if TRACE
+                ToolKit.LogArrayToFile<byte>("outbuf." + inputindex + ".log", outbuf);
+#endif
 
                 //using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\outbuf." + inputindex + ".log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
                 //{

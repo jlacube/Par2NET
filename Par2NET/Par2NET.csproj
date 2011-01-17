@@ -29,10 +29,10 @@
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>DEBUG</DefineConstants>
+    <DefineConstants>TRACE;DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -45,11 +45,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BinaryStreamReader.cs" />
+    <Compile Include="NewFileChecker.cs" />
     <Compile Include="SingletonProvider.cs" />
     <Compile Include="DiskFile.cs" />
     <Compile Include="FileChecker.cs" />
     <Compile Include="FileVerification.cs" />
-    <Compile Include="Interfaces\IParLibrary.cs" />
     <Compile Include="Packets\CreatorPacket.cs" />
     <Compile Include="Packets\DataBlock.cs" />
     <Compile Include="Packets\FileDescriptionPacket.cs" />
@@ -81,6 +81,10 @@
     <ProjectReference Include="..\FastGaloisFields\FastGaloisFields\FastGaloisFields.csproj">
       <Project>{2D8D74BA-12FD-47BE-A84F-D9BE25D60AB5}</Project>
       <Name>FastGaloisFields %28FastGaloisFields\FastGaloisFields%29</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Par2NET.Interfaces\Par2NET.Interfaces.csproj">
+      <Project>{FE5AAFEC-6C23-4179-8165-0720DD806688}</Project>
+      <Name>Par2NET.Interfaces</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

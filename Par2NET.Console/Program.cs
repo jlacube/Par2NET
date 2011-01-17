@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 
 using Par2NET.Tasks;
+using Par2NET.Interfaces;
 using System.Threading.Tasks;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -12,56 +13,54 @@ using CommandLine;
 
 namespace Par2NET.Console
 {
-    //        [Argument(ArgumentType.AtMostOnce, HelpText = "Count number of lines in the input text.")]
-    //        public bool lines;
-    //        [Argument(ArgumentType.AtMostOnce, HelpText="Count number of words in the input text.")]
-    //        public bool words;
-    //        [Argument(ArgumentType.AtMostOnce, HelpText="Count number of chars in the input text.")]
-    //        public bool chars;
-    //        [DefaultArgument(ArgumentType.MultipleUnique, HelpText="Input files to count.")]
-    //        public string[] files;
-
-    public class ProgramArguments
-    {
-        [Argument(ArgumentType.AtMostOnce, HelpText = "MultiThread switch", ShortName = "mt", LongName = "multithread", DefaultValue = true)]
-        public bool multithread;
-        [Argument(ArgumentType.AtMostOnce, HelpText = "PAR library version", ShortName = "v", LongName = "version", DefaultValue = ParVersion.Par2)]
-        public ParVersion version;
-        [Argument(ArgumentType.AtMostOnce, HelpText = "PAR library action to perform", ShortName = "a", LongName = "action", DefaultValue = ParAction.ParVerify)]
-        public ParAction action;
-        [Argument(ArgumentType.AtMostOnce, HelpText = "Output target directory", ShortName = "o", LongName = "outputPath", DefaultValue = "")]
-        public string targetPath;
-        [Argument(ArgumentType.MultipleUnique, HelpText = "Specific input files", ShortName = "if", LongName = "inputFile", DefaultValue = new string[] { })]
-        public string[] inputFiles;
-        [Argument(ArgumentType.MultipleUnique | ArgumentType.Required, HelpText = "Specific recorvery files", ShortName = "rf", LongName = "recoveryFile", DefaultValue = new string[] { })]
-        public string[] recoveryFiles;
-    }
-
     class Program
     {
         static void Main(string[] args)
         {
-            ProgramArguments _args = new ProgramArguments();
+            Par2LibraryArguments par2args = new Par2LibraryArguments();
 
-            if (!Parser.ParseArgumentsWithUsage(args, _args))
+            if (!Parser.ParseArgumentsWithUsage(args, par2args))
                 return;
 
-            Par2Library library = new Par2Library(_args.multithread);
+            switch (par2args.action)
+            {
+                case ParAction.ParCreate:
+                    if (par2args.inputFiles.Length == 0)
+                    {
+                        Parser.ArgumentsUsage(par2args.GetType());
+                        return;
+                    }
+                    break;
+                case ParAction.ParVerify:
+                case ParAction.ParRepair:
+                    if (par2args.recoveryFiles.Length == 0)
+                    {
+                        Parser.ArgumentsUsage(par2args.GetType());
+                        return;
+                    }
+                    break;
+            }
 
-            List<string> inputFiles = new List<string>(_args.inputFiles);
-            List<string> recoveryFiles = new List<string>(_args.recoveryFiles);
+            Par2Library library = new Par2Library(par2args.multithread);
 
-            if (string.IsNullOrEmpty(_args.targetPath))
-                _args.targetPath = Path.GetDirectoryName(_args.recoveryFiles[0]);
+            List<string> inputFiles = new List<string>(par2args.inputFiles);
+            List<string> recoveryFiles = new List<string>(par2args.recoveryFiles);
 
+            if (string.IsNullOrEmpty(par2args.targetPath))
+                par2args.targetPath = Path.GetDirectoryName(par2args.recoveryFiles[0]);
+
+#if TimeTrack
             DateTime startTime = DateTime.Now;
-            ParResult result = library.Process(_args.version, inputFiles, recoveryFiles, _args.action, _args.targetPath);
+#endif
+            ParResult result = library.Process(par2args);
+#if TimeTrack
             DateTime endTime = DateTime.Now;
             TimeSpan duration = endTime - startTime;
 
             System.Console.WriteLine("Duration : {0}h{1}m{2}s{3}ms", duration.Hours, duration.Minutes, duration.Seconds, duration.Milliseconds);
+#endif
 
-            System.Console.WriteLine("Par2NET result : {0}", result.ToString());
+            System.Console.WriteLine("Par2NET result : {0}", result);
             //recoveryFiles.Add(@"C:\USERS\Projects\__Perso\Par2NET\Par2NET\Tests\EntLib50.vol10+10.PAR2");
             //recoveryFiles.Add(@"C:\Documents and Settings\Jerome\My Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\EntLib50.vol10+10.PAR2");
             //recoveryFiles.Add(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\EntLib50.vol10+10.PAR2");

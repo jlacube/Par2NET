@@ -14,78 +14,7 @@ using System.Threading;
 
 namespace Par2NET
 {
-    [Flags]
-    public enum ParResult {
-        Success = 0,
-
-        RepairPossible = 1,  // Data files are damaged and there is
-        // enough recovery data available to
-        // repair them.
-
-        RepairNotPossible = 2,  // Data files are damaged and there is
-        // insufficient recovery data available
-        // to be able to repair them.
-
-        InvalidCommandLineArguments = 3,  // There was something wrong with the
-        // command line arguments
-
-        InsufficientCriticalData = 4,  // The PAR2 files did not contain sufficient
-        // information about the data files to be able
-        // to verify them.
-
-        RepairFailed = 5,  // Repair completed but the data files
-        // still appear to be damaged.
-
-
-        FileIOError = 6,  // An error occured when accessing files
-        LogicError = 7,  // An internal error occurred
-        MemoryError = 8,  // Out of memory
-    };
-
-    public enum ParVersion
-    {
-        Par1,       // PAR1 version
-        Par2        // PAR2 version
-    }
-
-    public enum ParAction
-    {
-        ParCreate,      // PAR creation
-        ParVerify,      // PAR verify
-        ParRepair       // PAR repair
-    }
-
-    public enum PacketType
-    {
-        Unknown = 0,
-        MagicPacket,
-        CreatorPacket,
-        MainPacket,
-        DescriptionPacket,
-        VerificationPacket,
-        RecoveryPacket
-    }
-
-    public enum MatchType
-    {
-        NoMatch = 0,
-        PartialMatch,
-        FullMatch
-    }
-
-    public enum NoiseLevel
-    {
-        Unknown = 0,
-        Silent,       // Absolutely no output (other than errors)
-        Quiet,        // Bare minimum of output
-        Normal,       // Normal level of output
-        Noisy,        // Lots of output
-        Debug         // Extra debugging information
-    }
-
-    
-
-    public class Par2Library
+    public class Par2Library : IParLibrary
     {
         public bool multithread = false;
 
@@ -163,17 +92,20 @@ namespace Par2NET
             newRecoverySet.FileSets.Clear();
         }
 
-        public ParResult Process(ParVersion version, List<string> inputFiles, List<string> recoveryFiles, ParAction action, string targetPath)
+        public ParResult Process(Par2LibraryArguments args)
         {
-            Par2Library.targetPath = targetPath;
+            Par2Library.targetPath = args.targetPath;
 
-            if (version == ParVersion.Par1)
-                return Par1Library().Process(inputFiles, recoveryFiles, action);
+            List<string> inputFiles = new List<string>(args.inputFiles);
+            List<string> recoveryFiles = new List<string>(args.recoveryFiles);
 
-            if (action != ParAction.ParCreate)
+            if (args.version == ParVersion.Par1)
+                return Par1Library().Process(inputFiles, recoveryFiles, args.action);
+
+            if (args.action != ParAction.ParCreate)
                 GetRecoveryFiles(recoveryFiles);
 
-            switch (action)
+            switch (args.action)
             {
                 case ParAction.ParCreate:
                     return Create(ref inputFiles, ref recoveryFiles);

@@ -7,6 +7,8 @@ using System.Security.Cryptography;
 using Par2NET.Packets;
 using System.Diagnostics;
 
+using Par2NET.Interfaces;
+
 namespace Par2NET
 {
     public class FileChecker

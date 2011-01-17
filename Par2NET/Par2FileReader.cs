@@ -6,6 +6,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 
 using Par2NET.Packets;
+using Par2NET.Interfaces;
 
 namespace Par2NET
 {
@@ -49,22 +50,22 @@ namespace Par2NET
 
         private PacketType GetPacketType(byte[] type)
         {
-            if (ToolKit.UnsafeCompare(type, filedescriptionpacket_type))
+            if (ToolKit.SafeCompare(type, filedescriptionpacket_type))
                 return PacketType.DescriptionPacket;
 
-            if (ToolKit.UnsafeCompare(type, creatorpacket_type))
+            if (ToolKit.SafeCompare(type, creatorpacket_type))
                 return PacketType.CreatorPacket;
 
-            if (ToolKit.UnsafeCompare(type, fileverificationpacket_type))
+            if (ToolKit.SafeCompare(type, fileverificationpacket_type))
                 return PacketType.VerificationPacket;
 
-            if (ToolKit.UnsafeCompare(type, mainpacket_type))
+            if (ToolKit.SafeCompare(type, mainpacket_type))
                 return PacketType.MainPacket;
 
-            if (ToolKit.UnsafeCompare(type, recoveryblockpacket_type))
+            if (ToolKit.SafeCompare(type, recoveryblockpacket_type))
                 return PacketType.RecoveryPacket;
 
-            if (ToolKit.UnsafeCompare(type, packet_magic))
+            if (ToolKit.SafeCompare(type, packet_magic))
                 return PacketType.MagicPacket;
 
             return PacketType.Unknown;

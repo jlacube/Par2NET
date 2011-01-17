@@ -50,6 +50,11 @@ namespace Par2NET.Packets
                 tmpPacket.fileids.Add(fileid);
             }
 
+            System.Threading.Tasks.Task.Factory.StartNew((b) =>
+            {
+                FastCRC32.FastCRC32 crc32 = new FastCRC32.FastCRC32((ulong)b);
+            }, tmpPacket.blocksize);
+
             return tmpPacket;
         }
     }

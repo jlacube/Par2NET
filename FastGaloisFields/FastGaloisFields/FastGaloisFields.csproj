@@ -30,7 +30,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -44,12 +44,20 @@
   <ItemGroup>
     <Compile Include="GaloisLongMultiplyTable16.cs" />
     <Compile Include="ReedSolomonGalois16.cs" />
-    <Compile Include="GaloisTable16.cs" />
     <Compile Include="ReedSolomon.cs" />
-    <Compile Include="Galois16.cs" />
     <Compile Include="GaloisTable8.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RSOutputRow.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\FastGaloisFieldsUnsafe\FastGaloisFieldsUnsafe.csproj">
+      <Project>{5F9D08C3-75CD-49AE-9F7D-F564AF67975A}</Project>
+      <Name>FastGaloisFieldsUnsafe</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\GaloisFields\GaloisFields.csproj">
+      <Project>{C85D3FAD-7809-45E6-9302-DD9D3567B703}</Project>
+      <Name>GaloisFields</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

@@ -9,6 +9,8 @@ namespace FastCRC32
     {
         private readonly static uint[] crcTable = null;
         private static uint[] windowTable = null;
+        private static uint maskwindow = 0;
+        private static bool not_init = true;
 
         public uint windowMask = 0;
 
@@ -16,20 +18,23 @@ namespace FastCRC32
         {
             unchecked
             {
-                crcTable = new uint[256];
-
-                uint polynomial = 0xEDB88320;
-
-                for (uint i = 0; i <= 255; i++)
+                if (crcTable == null)
                 {
-                    uint crc = i;
+                    crcTable = new uint[256];
 
-                    for (uint j = 0; j < 8; j++)
+                    uint polynomial = 0xEDB88320;
+
+                    for (uint i = 0; i <= 255; i++)
                     {
-                        crc = (crc >> 1) ^ ((crc & 1) != 0 ? polynomial : 0);
-                    }
+                        uint crc = i;
 
-                    crcTable[i] = crc;
+                        for (uint j = 0; j < 8; j++)
+                        {
+                            crc = (crc >> 1) ^ ((crc & 1) != 0 ? polynomial : 0);
+                        }
+
+                        crcTable[i] = crc;
+                    }
                 }
             }
         }
@@ -94,19 +99,26 @@ namespace FastCRC32
             unchecked
             {
                 //uint result = ~0;
-                uint result = 0xFFFFFFFF;
-
-                while (window > 0)
+                if (not_init)
                 {
-                    result = CRCUpdateChar(result, (char)0);
+                    uint result = 0xFFFFFFFF;    
 
-                    window--;
+                    while (window > 0)
+                    {
+                        result = CRCUpdateChar(result, (char)0);
+
+                        window--;
+                    }
+
+                    //result ^= ~0;
+                    result ^= 0xFFFFFFFF;
+
+                    windowMask = result;
+
+                    not_init = false;
                 }
 
-                //result ^= ~0;
-                result ^= 0xFFFFFFFF;
-
-                return result;
+                return windowMask;
             }
         }
 

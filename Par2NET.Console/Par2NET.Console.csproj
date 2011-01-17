@@ -32,8 +32,7 @@
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>
-    </DefineConstants>
+    <DefineConstants>TimeTrack</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <UseVSHostingProcess>false</UseVSHostingProcess>
@@ -48,11 +47,18 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CommandLineArguments.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\FastGaloisFieldsUnsafe\FastGaloisFieldsUnsafe.csproj">
+      <Project>{5F9D08C3-75CD-49AE-9F7D-F564AF67975A}</Project>
+      <Name>FastGaloisFieldsUnsafe</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Par2NET.Interfaces\Par2NET.Interfaces.csproj">
+      <Project>{FE5AAFEC-6C23-4179-8165-0720DD806688}</Project>
+      <Name>Par2NET.Interfaces</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Par2NET\Par2NET.csproj">
       <Project>{E05C1D72-80B5-4B77-829D-CCE04D545F65}</Project>
       <Name>Par2NET</Name>

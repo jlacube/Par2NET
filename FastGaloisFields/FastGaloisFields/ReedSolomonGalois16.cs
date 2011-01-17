@@ -4,6 +4,9 @@ using System.Linq;
 using System.Text;
 using FastGaloisFields.GaloisTables;
 using System.IO;
+using FastGaloisFieldsUnsafe;
+using System.Diagnostics;
+using System.Security;
 
 namespace FastGaloisFields
 {
@@ -16,7 +19,6 @@ namespace FastGaloisFields
         private uint[] datapresentindex = null;  // The index numbers of the data blocks that are present
         private uint[] datamissingindex = null;  // The index numbers of the data blocks that are missing
 
-        //private Galois16[] database = null;        // The "base" value to use for each input block
         private ushort[] database = null;        // The "base" value to use for each input block
 
         private uint outputcount = 0;       // Total number of output blocks
@@ -56,69 +58,65 @@ namespace FastGaloisFields
             return InternalProcess(factor, size, inputbuffer, outputbuffer);
         }
 
+        private bool InternalProcessSafe(Galois16 factor, uint size, byte[] inputbuffer, byte[] outputbuffer)
+        {
+            //Treat the buffers as arrays of 16-bit Galois values.
+            //Awfully long to execute
+
+            try
+            {
+                // Create Galois16 inputbuffer
+                Galois16[] inputGalois16 = new Galois16[inputbuffer.Length / 2];
+
+                // Create Galois16 outputbuffer
+                Galois16[] outputGalois16 = new Galois16[inputGalois16.Length];
+
+                // Fill Galois16 input buffer with inpuntbuffer values
+                for (int i = 0; i < inputGalois16.Length; ++i)
+                {
+                    inputGalois16[i] = (Galois16)(inputbuffer[2 * i + 1] << 8 | inputbuffer[2 * i]);
+                    outputGalois16[i] = (Galois16)(outputbuffer[2 * i + 1] << 8 | outputbuffer[2 * i]);
+                }
+
+                // Process the data
+                for (uint i = 0; i < outputGalois16.Length; ++i)
+                {
+                    outputGalois16[i] += inputGalois16[i] * factor.Value;
+                }
+
+                // Copy back data from Galois16 output buffer to outputbuffer (byte)
+                for (int i = 0; i < outputGalois16.Length; ++i)
+                {
+                    outputbuffer[2 * i + 1] = (byte)(outputGalois16[i].Value >> 8 & 0xFF);
+                    outputbuffer[2 * i] = (byte)(outputGalois16[i].Value & 0xFF);
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                return false;
+            }
+        }
+
         private bool InternalProcess(Galois16 factor, uint size, byte[] inputbuffer, byte[] outputbuffer)
         {
-            //TODO : Rewrite with TPL
-
-            //if (true)
-            //{
-
-            //}
-            //else
-            //{
-                // Treat the buffers as arrays of 16-bit Galois values.
-                // Awfully long to execute
-
-            //// Create Galois16 inputbuffer
-            //Galois16[] inputGalois16 = new Galois16[inputbuffer.Length / 2];
-
-            //// Create Galois16 outputbuffer
-            //Galois16[] outputGalois16 = new Galois16[inputGalois16.Length];
-
-            //// Fill Galois16 input buffer with inpuntbuffer values
-            //for (int i = 0; i < inputGalois16.Length; ++i)
-            //{
-            //    inputGalois16[i] = (Galois16)(inputbuffer[2*i+1] << 8 | inputbuffer[2*i]);
-            //    outputGalois16[i] = (Galois16)(outputbuffer[2 * i + 1] << 8 | outputbuffer[2 * i]);
-            //}
-
-            //// Process the data
-            //for (uint i = 0; i < outputGalois16.Length; ++i)
-            //{
-            //    outputGalois16[i] += inputGalois16[i] * factor.Value;
-            //}
-            ////}
-
-            //// Copy back data from Galois16 output buffer to outputbuffer (byte)
-            //for (int i = 0; i < outputGalois16.Length; ++i)
-            //{
-            //    outputbuffer[2*i+1] = (byte)(outputGalois16[i].Value >> 8 & 0xFF);
-            //    outputbuffer[2*i] = (byte)(outputGalois16[i].Value & 0xFF);
-            //}
-
-            unsafe
+            // Rewrite : TPL ?
+            // Rewrite : Dynamic load FastGaloisFieldsUnsafe
+            try
             {
-                fixed (byte* pInputBuffer = inputbuffer, pOutputBuffer = outputbuffer)
-                {
-                    UInt16* pInput = (UInt16*)pInputBuffer;
-                    UInt16* pOutput = (UInt16*)pOutputBuffer;
-
-                    for (int i = 0; i < inputbuffer.Length / 2; ++i)
-                    {
-                        Galois16 gInput = *pInput;
-                        Galois16 gOutput = *pOutput;
-
-                        gOutput += gInput * factor.Value;
-
-                        *pOutput = gOutput.Value;
-
-                        ++pInput;
-                        ++pOutput;
-                    }
-                }
+                FastGaloisFieldsUnsafeProcessor unsafeProcessor = new FastGaloisFieldsUnsafeProcessor();
+                return unsafeProcessor.InternalProcess(factor, size, inputbuffer, outputbuffer);
             }
-
-            return true;
+            catch (SecurityException se)
+            {
+                return InternalProcessSafe(factor, size, inputbuffer, outputbuffer);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+                return false;
+            }
         }
 
         public bool SetOutput(bool present, ushort exponent)
@@ -151,6 +149,18 @@ namespace FastGaloisFields
 
             return true;
         }
+
+        public static void LogArrayToFile<T>(string filename, T[] array)
+        {
+            using (StreamWriter sw = new StreamWriter(new FileStream(filename, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
+            {
+                for (int i = 0; i < array.Length; ++i)
+                {
+                    sw.WriteLine("index={0},data={1}", i, array[i].ToString());
+                }
+            }
+        }
+        
 
         // Set which of the source files are present and which are missing
         // and compute the base values to use for the vandermonde matrix.
@@ -197,13 +207,9 @@ namespace FastGaloisFields
                 database[index] = ibase;
             }
 
-            //using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\database.log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
-            //{
-            //    for (int i = 0; i < database.Length; ++i)
-            //    {
-            //        sw.WriteLine("i={0},d={1}", i, database[i]);
-            //    }
-            //}
+#if TRACE
+            LogArrayToFile<ushort>(@"database.log", database);
+#endif
 
             return true;
         }
@@ -401,24 +407,11 @@ namespace FastGaloisFields
                 row++;
             }
 
-            //using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\leftmatrix.before.gauss.log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
-            //{
-            //    for (int i = 0; i < leftmatrix.Length; ++i)
-            //    {
-            //        Galois16 g = leftmatrix[i];
-            //        sw.WriteLine("i={0},g={1}", i, g.Value);
-            //    }
-            //}
-
-            //using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\rightmatrix.before.gauss.log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
-            //{
-            //    for (int i = 0; i < rightmatrix.Length; ++i)
-            //    {
-            //        Galois16 g = rightmatrix[i];
-            //        sw.WriteLine("i={0},g={1}", i, g.Value);
-            //    }
-            //}
-
+#if TRACE
+            LogArrayToFile<Galois16>(@"leftmatrix.before.gauss.log", leftmatrix);
+            LogArrayToFile<Galois16>(@"rightmatrix.before.gauss.log", rightmatrix);
+#endif
+           
             //if (noiselevel > CommandLine::nlQuiet)
             //  cout << "Constructing: done." << endl;
 
@@ -432,23 +425,10 @@ namespace FastGaloisFields
                 //return success;
             }
 
-            //using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\leftmatrix.after.gauss.log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
-            //{
-            //    for (int i = 0; i < leftmatrix.Length; ++i)
-            //    {
-            //        Galois16 g = leftmatrix[i];
-            //        sw.WriteLine("i={0},g={1}", i, g.Value);
-            //    }
-            //}
-
-            //using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\rightmatrix.after.gauss.log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
-            //{
-            //    for (int i = 0; i < rightmatrix.Length; ++i)
-            //    {
-            //        Galois16 g = rightmatrix[i];
-            //        sw.WriteLine("i={0},g={1}", i, g.Value);
-            //    }
-            //}
+#if TRACE
+            LogArrayToFile<Galois16>(@"leftmatrix.after.gauss.log", leftmatrix);
+            LogArrayToFile<Galois16>(@"rightmatrix.after.gauss.log", rightmatrix);
+#endif
 
             return true;
         }
