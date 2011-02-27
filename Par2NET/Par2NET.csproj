@@ -46,7 +46,7 @@
   <ItemGroup>
     <Compile Include="BinaryStreamReader.cs" />
     <Compile Include="CriticalPacketEntry.cs" />
-    <Compile Include="NewFileChecker.cs" />
+    <Compile Include="FileChecker.cs" />
     <Compile Include="Packets\CriticalPacket.cs" />
     <Compile Include="Par2FileAllocation.cs" />
     <Compile Include="SingletonProvider.cs" />
@@ -86,9 +86,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Tests\EntLib50.chm" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="CRCs_Hashs.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

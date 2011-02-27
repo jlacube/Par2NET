@@ -12,7 +12,7 @@ using System.Threading;
 
 namespace Par2NET
 {
-    public class NewFileChecker
+    public class FileChecker
     {
         private static byte[] MD5Hash16k(string filename)
         {

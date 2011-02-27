@@ -1234,7 +1234,7 @@ namespace Par2NET
             byte[] md5hash = null;
             byte[] md5hash16k = null;
 
-            NewFileChecker.QuickCheckFile(fileVer.TargetFileName, (int)this.MainPacket.blocksize, out filesize, out nb_blocks, out md5hash16k, out md5hash);
+            FileChecker.QuickCheckFile(fileVer.TargetFileName, (int)this.MainPacket.blocksize, out filesize, out nb_blocks, out md5hash16k, out md5hash);
 
             return false;
         }
@@ -1248,7 +1248,7 @@ namespace Par2NET
         {
             MatchType matchType = MatchType.NoMatch;
 
-            NewFileChecker.CheckFile(fileVer.GetTargetFile(), fileVer.TargetFileName, (int)this.MainPacket.blocksize, fileVer.FileVerificationPacket.entries, fileVer.FileDescriptionPacket.hash16k, fileVer.FileDescriptionPacket.hashfull, ref matchType, verificationhashtablefull, verificationhashtable, expectedblocklist, ref expectedblockindex, this.multithreadCPU);
+            FileChecker.CheckFile(fileVer.GetTargetFile(), fileVer.TargetFileName, (int)this.MainPacket.blocksize, fileVer.FileVerificationPacket.entries, fileVer.FileDescriptionPacket.hash16k, fileVer.FileDescriptionPacket.hashfull, ref matchType, verificationhashtablefull, verificationhashtable, expectedblocklist, ref expectedblockindex, this.multithreadCPU);
 
             if (matchType == MatchType.FullMatch)
             {
