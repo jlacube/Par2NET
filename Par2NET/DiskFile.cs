@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.IO;
+using System.Diagnostics;
 
 namespace Par2NET
 {
@@ -12,7 +13,7 @@ namespace Par2NET
         private ulong filesize = 0;
         private FileStream hFile = null;
         private ulong offset = 0;
-        private bool exists = false;
+        //private bool exists = false;
 
         public DiskFile()
         {
@@ -68,7 +69,7 @@ namespace Par2NET
             {
                 if (create)
                 {
-                    hFile = new FileStream(filename, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
+                    hFile = new FileStream(filename, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
                     hFile.SetLength((long)filesize);
                     offset = filesize;
                 }
@@ -88,7 +89,7 @@ namespace Par2NET
                 return false;
             }
             
-            exists = true;
+            //exists = true;
 
             return true;
         }
@@ -129,6 +130,11 @@ namespace Par2NET
         internal bool Open(string _filename)
         {
             return CreateOrOpen(_filename, GetFileSize(_filename), false);
+        }
+
+        internal bool Open(string _filename, ulong _filesize)
+        {
+            return CreateOrOpen(_filename, _filesize, false);
         }
 
         private ulong GetFileSize(string _filename)
@@ -198,6 +204,7 @@ namespace Par2NET
             }
             catch (Exception ex)
             {
+                Debug.WriteLine(ex);
                 return false;
             }
 

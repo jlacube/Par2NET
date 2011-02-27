@@ -9,12 +9,14 @@ using System.IO;
 using FastGaloisFields;
 using System.Threading.Tasks;
 using System.Threading;
+using System.Diagnostics;
 
 namespace Par2NET
 {
     public class Par2RecoverySet
     {
-        private bool multithread = false;
+        private bool multithreadCPU = false;
+        private bool multithreadIO = false;
 
         public CreatorPacket CreatorPacket = null;
         public MainPacket MainPacket = null;
@@ -41,6 +43,8 @@ namespace Par2NET
         private List<DataBlock> copyblocks = new List<DataBlock>();              // Which DataBlocks will copied back to disk
         private List<DataBlock> outputblocks = new List<DataBlock>();            // Which DataBlocks have to calculated using RS
 
+        private List<FileVerification> verifylist = new List<FileVerification>();
+
         private Dictionary<uint, FileVerificationEntry> verificationhashtable = new Dictionary<uint, FileVerificationEntry>();
         private Dictionary<uint, FileVerificationEntry> verificationhashtablefull = new Dictionary<uint, FileVerificationEntry>();
         private List<FileVerificationEntry> expectedblocklist = new List<FileVerificationEntry>();
@@ -49,12 +53,43 @@ namespace Par2NET
         static ReedSolomonGalois16     _rs = new ReedSolomonGalois16();                      // The Reed Solomon matrix.
         ReedSolomonGalois16 rs = Par2RecoverySet._rs;
 
-        public Par2RecoverySet(bool _multithread)
+        private static object _syncObject = new object();
+        public int recoveryfilecount = 0;
+        public int redundancy = 0;
+        public int recoveryblockcount;
+        public ParScheme recoveryfilescheme;
+        private bool deferhashcomputation = false;
+        private ulong largestfilesize = 0;
+        private DiskFile[] recoveryfiles = null;
+
+        private List<IPar2Packet> criticalpackets = new List<IPar2Packet>();
+
+        private List<CriticalPacketEntry> criticalpacketentries = new List<CriticalPacketEntry>();
+
+        MainPacket mainpacket = null;
+        CreatorPacket creatorpacket = null;
+
+        public Par2RecoverySet(bool _multithreadCPU, bool _multithreadIO)
+            : this (_multithreadCPU, _multithreadIO, null)
         {
-            multithread = _multithread;
         }
 
-        private List<FileVerification> verifylist = new List<FileVerification>();
+        public Par2RecoverySet(bool _multithreadCPU, bool _multithreadIO, Par2LibraryArguments args)
+        {
+            multithreadCPU = _multithreadCPU;
+            multithreadIO = _multithreadIO;
+
+            if (args != null)
+            {
+                /* Par2Creator section */
+                CreateMainPacket(args);
+                AddMainPacket(mainpacket);
+                redundancy = args.redundancy;
+                recoveryfilecount = args.recoveryfilecount;
+                recoveryblockcount = args.recoveryblockcount;
+                recoveryfilescheme = args.recoveryfilescheme;
+            }
+        }
 
         private FileVerification FileVerification(string fileid)
         {
@@ -63,6 +98,910 @@ namespace Par2NET
 
             return FileSets[fileid];
         }
+
+        #region Par2Creator methods
+
+        private long FileSize(string file)
+        {
+            if (!File.Exists(file))
+                return 0;
+
+            return (new FileInfo(file)).Length;
+        }
+
+        // Compute block size from block count or vice versa depending on which was
+        // specified on the command line
+        public bool ComputeBlockSizeAndBlockCount(ref List<string> inputFiles)
+        {
+            // Determine blocksize from sourceblockcount or vice-versa
+            int blocksize = (int)MainPacket.blocksize;
+
+            foreach (string file in inputFiles)
+            {
+                if (!File.Exists(file))
+                    continue;
+
+                ulong filesize = (ulong)FileSize(file);
+                if (filesize > largestfilesize)
+                    largestfilesize = filesize;
+            }
+
+            if (blocksize > 0)
+            {
+                long count = 0;
+
+                foreach (string file in inputFiles)
+                {
+                    count += (FileSize(file) + blocksize - 1) / blocksize;
+                }
+
+                if (count > 32768)
+                {
+                    Console.WriteLine("Block size is too small. It would require {0} blocks.", count);
+                    return false;
+                }
+
+                sourceblockcount = (uint)count;
+            }
+            else if (sourceblockcount > 0)
+            {
+                if (sourceblockcount < inputFiles.Count)
+                {
+                    // The block count cannot be less that the number of files.
+
+                    Console.WriteLine("Block count is too small.");
+                    return false;
+                }
+                else if (sourceblockcount == inputFiles.Count)
+                {
+                    // If the block count is the same as the number of files, then the block
+                    // size is the size of the largest file (rounded up to a multiple of 4).
+
+                    long largestsourcesize = 0;
+
+                    foreach (string file in inputFiles)
+                    {
+                        if (largestsourcesize < FileSize(file))
+                        {
+                            largestsourcesize = FileSize(file);
+                        }
+                    }
+
+                    blocksize = (int)(largestsourcesize + 3) & ~3;
+                }
+                else
+                {
+                    long totalsize = 0;
+
+                    foreach (string file in inputFiles)
+                    {
+                        totalsize += (FileSize(file) + 3) / 4;
+                    }
+
+                    if (sourceblockcount > totalsize)
+                    {
+                        sourceblockcount = (uint)totalsize;
+                        blocksize = 4;
+                    }
+                    else
+                    {
+                        // Absolute lower bound and upper bound on the source block size that will
+                        // result in the requested source block count.
+                        long lowerBound = totalsize / sourceblockcount;
+                        long upperBound = (totalsize + sourceblockcount - inputFiles.Count - 1) / (sourceblockcount - inputFiles.Count);
+
+                        long bestsize = lowerBound;
+                        long bestdistance = 1000000;
+                        long bestcount = 0;
+
+                        long count;
+                        long size;
+
+                        // Work out how many blocks you get for the lower bound block size
+                        {
+                            size = lowerBound;
+
+                            count = 0;
+                            foreach (string file in inputFiles)
+                            {
+                                count += ((FileSize(file) + 3) / 4 + size - 1) / size;
+                            }
+
+                            if (bestdistance > (count > sourceblockcount ? count - sourceblockcount : sourceblockcount - count))
+                            {
+                                bestdistance = (count > sourceblockcount ? count - sourceblockcount : sourceblockcount - count);
+                                bestcount = count;
+                                bestsize = size;
+                            }
+                        }
+
+                        // Work out how many blocks you get for the upper bound block size
+                        {
+                            size = upperBound;
+
+                            count = 0;
+                            foreach (string file in inputFiles)
+                            {
+                                count += ((FileSize(file) + 3) / 4 + size - 1) / size;
+                            }
+
+                            if (bestdistance > (count > sourceblockcount ? count - sourceblockcount : sourceblockcount - count))
+                            {
+                                bestdistance = (count > sourceblockcount ? count - sourceblockcount : sourceblockcount - count);
+                                bestcount = count;
+                                bestsize = size;
+                            }
+                        }
+
+                        // Use binary search to find best block size
+                        while (lowerBound + 1 < upperBound)
+                        {
+                            size = (lowerBound + upperBound) / 2;
+
+                            count = 0;
+                            foreach (string file in inputFiles)
+                            {
+                                count += ((FileSize(file) + 3) / 4 + size - 1) / size;
+                            }
+
+                            if (bestdistance > (count > sourceblockcount ? count - sourceblockcount : sourceblockcount - count))
+                            {
+                                bestdistance = (count > sourceblockcount ? count - sourceblockcount : sourceblockcount - count);
+                                bestcount = count;
+                                bestsize = size;
+                            }
+
+                            if (count < sourceblockcount)
+                            {
+                                upperBound = size;
+                            }
+                            else if (count > sourceblockcount)
+                            {
+                                lowerBound = size;
+                            }
+                            else
+                            {
+                                upperBound = size;
+                            }
+                        }
+
+                        size = bestsize;
+                        count = bestcount;
+
+                        if (count > 32768)
+                        {
+                            Console.WriteLine("Error calculating block size.");
+                            return false;
+                        }
+
+                        sourceblockcount = (uint)count;
+                        blocksize = (int)size * 4;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        // Determine how many recovery blocks to create based on the source block
+        // count and the requested level of redundancy.
+        public bool ComputeRecoveryBlockCount(int redundancy)
+        {
+            // Determine recoveryblockcount
+            recoveryblockcount = (int)(sourceblockcount * redundancy + 50) / 100;
+
+            // Force valid values if necessary
+            if (recoveryblockcount == 0 && redundancy > 0)
+                recoveryblockcount = 1;
+
+            if (recoveryblockcount > 65536)
+            {
+                Console.WriteLine("Too many recovery blocks requested.");
+                return false;
+            }
+
+            //// Check that the last recovery block number would not be too large
+            //if (firstrecoveryblock + recoveryblockcount >= 65536)
+            //{
+            //    cerr << "First recovery block number is too high." << endl;
+            //    return false;
+            //}
+
+            return true;
+        }
+
+        // Determine how much recovery data can be computed on one pass
+        public bool CalculateProcessBlockSize(ulong memorylimit)
+        {
+            // Are we computing any recovery blocks
+            if (recoveryblockcount == 0)
+            {
+                deferhashcomputation = false;
+            }
+            else
+            {
+                // Would single pass processing use too much memory
+                if (MainPacket.blocksize * (ulong)recoveryblockcount > memorylimit)
+                {
+                    unchecked
+                    {
+                        // Pick a size that is small enough
+                        chunksize = (ulong)~3 & (memorylimit / (ulong)recoveryblockcount);
+                    }
+
+                    deferhashcomputation = false;
+                }
+                else
+                {
+                    chunksize = MainPacket.blocksize;
+
+                    deferhashcomputation = true;
+                }
+            }
+
+            return true;
+        }
+
+        // Determine how many recovery files to create.
+        public bool ComputeRecoveryFileCount()
+        {
+            // Are we computing any recovery blocks
+            if (recoveryblockcount == 0)
+            {
+                recoveryfilecount = 0;
+                return true;
+            }
+
+            switch (recoveryfilescheme)
+            {
+                case ParScheme.Unknown:
+                    {
+                        Debug.Assert(false);
+                        return false;
+                    }
+                case ParScheme.Variable:
+                case ParScheme.Uniform:
+                    {
+                        if (recoveryfilecount == 0)
+                        {
+                            // If none specified then then filecount is roughly log2(blockcount)
+                            // This prevents you getting excessively large numbers of files
+                            // when the block count is high and also allows the files to have
+                            // sizes which vary exponentially.
+
+                            for (int blocks = recoveryblockcount; blocks > 0; blocks >>= 1)
+                            {
+                                recoveryfilecount++;
+                            }
+                        }
+
+                        if (recoveryfilecount > recoveryblockcount)
+                        {
+                            // You cannot have move recovery files that there are recovery blocks
+                            // to put in them.
+                            Console.WriteLine("Too many recovery files specified.");
+                            return false;
+                        }
+                    }
+                    break;
+
+                case ParScheme.Limited:
+                    {
+                        // No recovery file will contain more recovery blocks than would
+                        // be required to reconstruct the largest source file if it
+                        // were missing. Other recovery files will have recovery blocks
+                        // distributed in an exponential scheme.
+
+                        uint largest = (uint)((largestfilesize + MainPacket.blocksize - 1) / MainPacket.blocksize);
+                        uint whole = (uint)recoveryblockcount / largest;
+                        whole = (whole >= 1) ? whole - 1 : 0;
+
+                        uint extra = (uint)recoveryblockcount - whole * largest;
+                        recoveryfilecount = (int)whole;
+                        for (uint blocks = extra; blocks > 0; blocks >>= 1)
+                        {
+                            recoveryfilecount++;
+                        }
+                    }
+                    break;
+            }
+
+            return true;
+        }
+
+        // Open all of the source files, compute the Hashes and CRC values, and store
+        // the results in the file verification and file description packets.
+        public bool OpenSourceFiles(ref List<string> inputFiles)
+        {
+            foreach (string file in inputFiles)
+            {
+                FileVerification fileVer = new FileVerification();
+
+                if (!fileVer.Open(file, MainPacket.blocksize, deferhashcomputation))
+                {
+                    fileVer = null;
+                    return false;
+                }
+
+                fileVer.RecordCriticalPackets(criticalpackets);
+
+                SourceFiles.Add(fileVer);
+
+                fileVer.Close();
+            }
+
+
+            return true;
+        }
+
+        // Create the main packet and determine the setid to use with all packets
+        private bool CreateMainPacket(Par2LibraryArguments args)
+        {
+            // Construct the main packet from the list of source files and the block size.
+            // Create the packet (sourcefiles will get sorted into FileId order).
+            mainpacket = MainPacket.Create(args);
+
+            // Add the main packet to the list of critical packets.
+            criticalpackets.Add(mainpacket);
+            
+            return true;
+        }
+
+        // Create the creator packet.
+        public bool CreateCreatorPacket()
+        {
+            // Construct & Create the creator packet
+            creatorpacket = CreatorPacket.Create(MainPacket.header.setid);
+
+            // Create the packet
+            return true;
+        }
+
+        // Initialise all of the source blocks ready to start reading data from the source files.
+        internal bool CreateSourceBlocks()
+        {
+            // Allocate the array of source blocks
+            this.inputblocks = new List<DataBlock>();
+
+            foreach (FileVerification fileVer in SourceFiles)
+            {
+                // Allocate the appopriate number of source blocks to each source file.
+                // sourceblock will be advanced.
+                fileVer.InitialiseSourceBlocks(ref inputblocks, MainPacket.blocksize);
+            }
+
+            return true;
+        }
+
+        // Create all of the output files and allocate all packets to appropriate file offets.
+        internal bool InitialiseOutputFiles(string par2filename)
+        {
+            // Choose filenames and decide which recovery blocks to place in each file          
+            Par2FileAllocation[] fileallocations = new Par2FileAllocation[recoveryfilecount + 1];
+
+            uint exponent = 0; //firstrecoveryblock originally
+            uint filenumber = 0;
+
+            if (recoveryfilecount > 0)
+            {
+                switch (recoveryfilescheme)
+                {
+                    case ParScheme.Unknown:
+                        // Should never happened
+                        Debug.Assert(false);
+                        return false;
+
+                    case ParScheme.Uniform:
+                        // Files will have roughly the same number of recovery blocks each.
+
+                        uint uibase = (uint)(recoveryblockcount / recoveryfilecount);
+                        uint uiremainder = (uint)(recoveryblockcount % recoveryfilecount);
+
+                        for (filenumber = 0; filenumber < recoveryfilecount; filenumber++)
+                        {
+                            fileallocations[filenumber] = new Par2FileAllocation();
+                            fileallocations[filenumber].exponent = exponent;
+                            fileallocations[filenumber].count = filenumber < uiremainder ? uibase + 1 : uibase;
+                            exponent += fileallocations[filenumber].count;
+                        }
+                        break;
+
+                    case ParScheme.Variable:
+                        // Files will have recovery blocks allocated in an exponential fashion.
+
+                        // Work out how many blocks to place in the smallest file
+                        uint lowblockcount = 1;
+                        uint maxrecoveryblocks = (uint)((1 << recoveryfilecount) - 1);
+                        while (maxrecoveryblocks < recoveryblockcount)
+                        {
+                            lowblockcount <<= 1;
+                            maxrecoveryblocks <<= 1;
+                        }
+
+                        // Allocate the blocks.
+                        uint blocks = (uint)recoveryblockcount;
+                        for (filenumber = 0; filenumber < recoveryfilecount; filenumber++)
+                        {
+                            uint number = Math.Min(lowblockcount, blocks);
+                            fileallocations[filenumber] = new Par2FileAllocation();
+                            fileallocations[filenumber].exponent = exponent;
+                            fileallocations[filenumber].count = number;
+                            exponent += number;
+                            blocks -= number;
+                            lowblockcount <<= 1;
+                        }
+                        break;
+
+                    case ParScheme.Limited:
+                        // Files will be allocated in an exponential fashion but the
+                        // Maximum file size will be limited.
+
+                        uint largest = (uint)((largestfilesize + MainPacket.blocksize - 1) / MainPacket.blocksize);
+                        filenumber = (uint)recoveryfilecount;
+                        blocks = (uint)recoveryblockcount;
+
+                        //exponent = firstrecoveryblock + recoveryblockcount;
+                        exponent = (uint)(0 + recoveryblockcount);
+
+                        // Allocate uniformly at the top
+                        while (blocks >= 2 * largest && filenumber > 0)
+                        {
+                            filenumber--;
+                            exponent -= largest;
+                            blocks -= largest;
+
+                            fileallocations[filenumber] = new Par2FileAllocation();
+                            fileallocations[filenumber].exponent = exponent;
+                            fileallocations[filenumber].count = largest;
+                        }
+                        Debug.Assert(blocks > 0 && filenumber > 0);
+
+                        //exponent = firstrecoveryblock;
+                        exponent = 0;
+                        uint count = 1;
+                        uint files = filenumber;
+
+                        // Allocate exponentially at the bottom
+                        for (filenumber = 0; filenumber < files; filenumber++)
+                        {
+                            uint number = Math.Min(count, blocks);
+                            fileallocations[filenumber] = new Par2FileAllocation();
+                            fileallocations[filenumber].exponent = exponent;
+                            fileallocations[filenumber].count = number;
+
+                            exponent += number;
+                            blocks -= number;
+                            count <<= 1;
+                        }
+                        break;
+                }
+            }
+
+
+            // There will be an extra file with no recovery blocks.
+            fileallocations[recoveryfilecount] = new Par2FileAllocation();
+            fileallocations[recoveryfilecount].exponent = exponent;
+            fileallocations[recoveryfilecount].count = 0;
+
+            // Determine the format to use for filenames of recovery files
+
+            uint limitLow = 0;
+            uint limitCount = 0;
+            for (filenumber = 0; filenumber <= recoveryfilecount; filenumber++)
+            {
+                if (limitLow < fileallocations[filenumber].exponent)
+                {
+                    limitLow = fileallocations[filenumber].exponent;
+                }
+                if (limitCount < fileallocations[filenumber].count)
+                {
+                    limitCount = fileallocations[filenumber].count;
+                }
+            }
+
+            uint digitsLow = 1;
+            for (uint t = limitLow; t >= 10; t /= 10)
+            {
+                digitsLow++;
+            }
+
+            uint digitsCount = 1;
+            for (uint t = limitCount; t >= 10; t /= 10)
+            {
+                digitsCount++;
+            }
+
+            //string filenameformat = string.Format("%%s.vol%%0%dd+%%0%dd.par2", digitsLow, digitsCount);
+            //string filenameformat = string.Format("{{0}}.vol{{1:{0}}}+{{2:{1}}}.par2", digitsLow, digitsCount);
+            string filenameformat = string.Format("{{0}}.vol{{1:00}}+{{2:00}}.par2", digitsLow, digitsCount);
+
+            // Set the filenames
+            for (filenumber = 0; filenumber < recoveryfilecount; filenumber++)
+            {
+                fileallocations[filenumber].filename = string.Format(filenameformat, par2filename, fileallocations[filenumber].exponent, fileallocations[filenumber].count);
+            }
+            fileallocations[recoveryfilecount].filename = par2filename + ".par2";
+
+
+            // Allocate the recovery files
+            this.recoveryfiles = new DiskFile[recoveryfilecount + 1];
+
+            // Allocate packets to the output files
+            {
+                byte[] setid = mainpacket.header.setid;
+
+                int fai = 0;
+
+                // For each recovery file:
+                for (int i = 0; i < recoveryfilecount + 1; ++i)
+                {
+                    recoveryfiles[i] = new DiskFile();
+
+                    // How many recovery blocks in this file
+                    uint count = fileallocations[fai].count;
+
+                    // start at the beginning of the recovery file
+                    ulong offset = 0;
+
+                    if (count == 0)
+                    {
+                        // Write one set of critical packets
+                        foreach (CriticalPacket criticalPacket in criticalpackets)
+                        {
+                            criticalpacketentries.Add(new CriticalPacketEntry(recoveryfiles[i], offset, criticalPacket));
+                            offset += criticalPacket.PacketLength();
+                        }
+                    }
+                    else
+                    {
+                        // How many copies of each critical packet
+                        uint copies = 0;
+                        for (uint t = count; t > 0; t >>= 1)
+                        {
+                            copies++;
+                        }
+
+                        // Get ready to iterate through the critical packets
+                        uint packetCount = 0;
+                        //list<CriticalPacket*>::const_iterator nextCriticalPacket = criticalpackets.end();
+
+                        // What is the first exponent
+                        exponent = fileallocations[fai].exponent;
+
+                        // Start allocating the recovery packets
+                        uint limit = exponent + count;
+
+                        while (exponent < limit)
+                        {
+                            // Add the next recovery packet
+                            RecoveryPacket recoverypacket = RecoveryPacket.Create(recoveryfiles[i], offset, MainPacket.blocksize, exponent, setid);
+
+                            offset += recoverypacket.PacketLength();
+                            //++recoverypacket;
+                            RecoveryPackets.Add(recoverypacket);
+                            ++exponent;
+
+                            // Add some critical packets
+                            packetCount += (uint)(copies * criticalpackets.Count);
+                            int cpi = 0;
+                            while (packetCount >= count)
+                            {
+                                criticalpacketentries.Add(new CriticalPacketEntry(recoveryfiles[i], offset, (CriticalPacket)criticalpackets[cpi]));
+                                //if (nextCriticalPacket == criticalpackets.end()) nextCriticalPacket = criticalpackets.begin();
+
+                                offset += criticalpackets[cpi].PacketLength();
+                                //++nextCriticalPacket;
+                                ++cpi;
+
+                                packetCount -= count;
+                            }
+                        }
+                    }
+
+                    // Add one copy of the creator packet
+                    criticalpacketentries.Add(new CriticalPacketEntry(recoveryfiles[i], offset, creatorpacket));
+
+                    offset += creatorpacket.PacketLength();
+
+                    // Create the file on disk and make it the required size
+                    if (!recoveryfiles[i].Create(fileallocations[fai].filename, offset))
+                        return false;
+
+                    ++fai;
+                }
+            }
+
+            return true;
+        }
+
+        // Allocate memory buffers for reading and writing data to disk.
+        internal bool AllocateBuffers()
+        {
+            inputbuffer = new byte[chunksize];
+            outputbuffer = new byte[chunksize * (ulong)recoveryblockcount];
+
+            if (inputbuffer == null || outputbuffer == null)
+            {
+                Console.Error.WriteLine("Could not allocate buffer memory.");
+                return false;
+            }
+
+            return true;
+        }
+
+        // Compute the Reed Solomon matrix
+        internal bool ComputeRSMatrix()
+        {
+            // Set the number of input blocks
+            if (!rs.SetInput(sourceblockcount))
+                return false;
+
+            // Set the number of output blocks to be created
+            //if (!rs.SetOutput(false, (ushort)firstrecoveryblock, (ushort)firstrecoveryblock + (ushort)(recoveryblockcount - 1)))
+            if (!rs.SetOutput(false, (ushort)0, (ushort)(recoveryblockcount - 1)))
+                return false;
+
+            // Compute the RS matrix
+            if (!rs.Compute())
+                return false;
+
+            return true;
+        }
+
+        // Read source data, process it through the RS matrix and write it to disk.
+        internal bool ProcessData(ulong blockoffset, ulong blocklength)
+        {
+            // Clear the output buffer
+            outputbuffer = new byte[chunksize * (ulong)recoveryblockcount];
+
+            // If we have defered computation of the file hash and block crc and hashes
+            // sourcefile and sourceindex will be used to update them during
+            // the main recovery block computation
+            uint sourceindex = 0;
+            int sourcefileindex = 0;
+
+            //DataBlock sourceblock;
+            uint inputblock = 0;
+
+            DiskFile lastopenfile = null;
+
+            // For each input block
+            foreach (DataBlock sourceblock in inputblocks)
+            {
+                FileVerification sourcefile = SourceFiles[sourcefileindex];
+
+                // Are we reading from a new file?
+                if (lastopenfile != sourceblock.GetDiskFile())
+                {
+                    // Close the last file
+                    if (lastopenfile != null)
+                    {
+                        lastopenfile.Close();
+                    }
+
+                    // Open the new file
+                    lastopenfile = sourceblock.GetDiskFile();
+                    if (!lastopenfile.Open())
+                    {
+                        return false;
+                    }
+                }
+                // Read data from the current input block
+                if (!sourceblock.ReadData(blockoffset, (uint)blocklength, inputbuffer))
+                    return false;
+
+                if (deferhashcomputation)
+                {
+                    Debug.Assert(blockoffset == 0 && blocklength == MainPacket.blocksize);
+                    //Debug.Assert(sourcefileindex < SourceFiles.Count - 1); //TODO: Check Assert against c++ lib
+
+                    sourcefile.UpdateHashes(sourceindex, inputbuffer, blocklength);
+                }
+
+                // Function that does the subtask in multiple threads if appropriate.
+                if (!CreateParityBlocks(blocklength, inputblock))
+                    return false;
+
+                // Work out which source file the next block belongs to
+                if (++sourceindex >= sourcefile.BlockCount())
+                {
+                    sourceindex = 0;
+                    ++sourcefileindex;
+                }
+
+                inputblock++;
+            }
+
+            // Close the last file
+            if (lastopenfile != null)
+            {
+                lastopenfile.Close();
+            }
+
+            //if (noiselevel > CommandLine::nlQuiet)
+            //  cout << "Writing recovery packets\r";
+
+            // For each output block
+            for (uint outputblock = 0; outputblock < recoveryblockcount; outputblock++)
+            {
+                // Select the appropriate part of the output buffer
+                // Write the data to the recovery packet
+                if (!RecoveryPackets[(int)outputblock].WriteData(blockoffset, blocklength, outputbuffer, chunksize * outputblock))
+                    return false;
+            }
+
+            //if (noiselevel > CommandLine::nlQuiet)
+            //  cout << "Wrote " << recoveryblockcount * blocklength << " bytes to disk" << endl;
+
+            return true;
+        }
+
+        private bool CreateParityBlocks(ulong blocklength, uint inputindex)
+        {
+            // Used from within ProcessData.
+
+            if (recoveryblockcount == 0)
+                return true;		// Nothing to do, actually
+
+            bool rv = true;		// Optimistic default
+
+            int lNumThreads = Environment.ProcessorCount;
+
+            // First, establish the number of blocks to be processed by each thread. Of course the last
+            // one started might get some less...
+            int lNumBlocksPerThread = (recoveryblockcount - 1) / lNumThreads + 1;		// Round up
+            uint lCurrentStartBlockNo = 0;
+
+            List<Task> tasks = new List<Task>();
+
+            while (lCurrentStartBlockNo < missingblockcount)
+            {
+                uint lNextStartBlockNo = (uint)(lCurrentStartBlockNo + lNumBlocksPerThread);
+                if (lNextStartBlockNo > missingblockcount)
+                    lNextStartBlockNo = missingblockcount;		// Constraint
+
+                if (multithreadCPU)
+                {
+                    //MT : OK
+                    object[] args = new object[] { blocklength, inputindex, lCurrentStartBlockNo, lNextStartBlockNo };
+                    tasks.Add(Task.Factory.StartNew((a) =>
+                    {
+                        object[] list = (object[])a;
+                        uint bl = (uint)list[0];
+                        uint ii = (uint)list[1];
+                        uint csb = (uint)list[2];
+                        uint nsb = (uint)list[3];
+                        CreateParityBlockRange(bl, ii, csb, nsb);
+                    }, args, TaskCreationOptions.LongRunning));
+                }
+                else
+                {
+                    //ST
+                    CreateParityBlockRange((uint)blocklength, inputindex, lCurrentStartBlockNo, lNextStartBlockNo);
+                }
+
+                lCurrentStartBlockNo = lNextStartBlockNo;
+            }
+
+            Task.WaitAll(tasks.ToArray());
+
+            return rv;
+        }
+
+        //-----------------------------------------------------------------------------
+        private void CreateParityBlockRange(uint blocklength, uint inputindex, uint aStartBlockNo, uint aEndBlockNo)
+        {
+            // This function runs in multiple threads.
+            // For each output block
+            for (uint outputindex = aStartBlockNo; outputindex < aEndBlockNo; outputindex++)
+            {
+                // Select the appropriate part of the output buffer
+                //byte[] outbuf = new byte[blocklength];
+
+                //Buffer.BlockCopy(outputbuffer, (int)(chunksize * outputindex), outbuf, 0, outbuf.Length);
+
+                // Process the data
+                rs.Process(blocklength, inputindex, inputbuffer, outputindex, outputbuffer, (int)(chunksize * outputindex), blocklength);
+
+                //Buffer.BlockCopy(outbuf, 0, outputbuffer, (int)(chunksize * outputindex), outbuf.Length);
+            }
+        }
+
+        private void CreateParityBlockRange_orig(uint blocklength, uint inputindex, uint aStartBlockNo, uint aEndBlockNo)
+        {
+            // This function runs in multiple threads.
+            // For each output block
+            for (uint outputindex = aStartBlockNo; outputindex < aEndBlockNo; outputindex++)
+            {
+                // Select the appropriate part of the output buffer
+                byte[] outbuf = new byte[blocklength];
+
+                Buffer.BlockCopy(outputbuffer, (int)(chunksize * outputindex), outbuf, 0, outbuf.Length);
+
+                // Process the data
+                rs.Process_orig(blocklength, inputindex, inputbuffer, outputindex, outbuf);
+
+#if TRACE
+                ToolKit.LogArrayToFile<byte>("outbuf." + inputindex + ".log", outbuf);
+#endif
+                Buffer.BlockCopy(outbuf, 0, outputbuffer, (int)(chunksize * outputindex), outbuf.Length);
+            }
+        }
+
+        // Finish computation of the recovery packets and write the headers to disk.
+        internal bool WriteRecoveryPacketHeaders()
+        {
+            foreach (RecoveryPacket recoverypacket in this.RecoveryPackets)
+            {
+                if (!recoverypacket.WriteHeader())
+                    return false;
+            }
+
+            return true;
+        }
+
+        internal bool FinishFileHashComputation()
+        {
+            // If we defered the computation of the full file hash, then we finish it now
+            if (deferhashcomputation)
+            {
+                // For each source file
+                foreach (FileVerification fileVer in SourceFiles)
+                {
+                    fileVer.FinishHashes();
+                }
+            }
+
+            return true;
+        }
+
+        // Fill in all remaining details in the critical packets.
+        internal bool FinishCriticalPackets()
+        {
+            // Get the setid from the main packet
+            byte[] setid = MainPacket.header.setid;
+
+            foreach (IPar2Packet criticalpacket in criticalpackets)
+            {
+                // Store the setid in each of the critical packets
+                // and compute the packet_hash of each one.
+                criticalpacket.FinishPacket(setid);
+            }
+
+            return true;
+        }
+
+        // Write all other critical packets to disk.
+        internal bool WriteCriticalPackets()
+        {
+            foreach (CriticalPacketEntry packetentry in criticalpacketentries)
+            {
+                if (!packetentry.WritePacket())
+                    return false;
+            }
+
+            return true;
+        }
+
+        // Close all files.
+        internal bool CloseFiles()
+        {
+            try
+            {
+                foreach (DiskFile file in recoveryfiles)
+                {
+                    file.Close();
+                }
+
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        #endregion
 
         public bool CheckPacketsConsistency()
         {
@@ -149,6 +1088,8 @@ namespace Par2NET
                     SourceFiles.Add(fileVer);
             }
 
+            SourceFiles.Sort();
+
             return true;
         }
 
@@ -198,7 +1139,7 @@ namespace Par2NET
             {
                 bool result = true;
 
-                if (!multithread)
+                if (!multithreadIO)
                 {
                     //ST
                     foreach (FileVerification fileVer in SourceFiles)
@@ -293,7 +1234,7 @@ namespace Par2NET
             byte[] md5hash = null;
             byte[] md5hash16k = null;
 
-            FileChecker.QuickCheckFile(fileVer.TargetFileName, (int)this.MainPacket.blocksize, out filesize, out nb_blocks, out md5hash16k, out md5hash);
+            NewFileChecker.QuickCheckFile(fileVer.TargetFileName, (int)this.MainPacket.blocksize, out filesize, out nb_blocks, out md5hash16k, out md5hash);
 
             return false;
         }
@@ -307,7 +1248,7 @@ namespace Par2NET
         {
             MatchType matchType = MatchType.NoMatch;
 
-            NewFileChecker.CheckFile(fileVer.GetTargetFile(), fileVer.TargetFileName, (int)this.MainPacket.blocksize, fileVer.FileVerificationPacket.entries, fileVer.FileDescriptionPacket.hash16k, fileVer.FileDescriptionPacket.hashfull, ref matchType, verificationhashtablefull, verificationhashtable, expectedblocklist, ref expectedblockindex, this.multithread);
+            NewFileChecker.CheckFile(fileVer.GetTargetFile(), fileVer.TargetFileName, (int)this.MainPacket.blocksize, fileVer.FileVerificationPacket.entries, fileVer.FileDescriptionPacket.hash16k, fileVer.FileDescriptionPacket.hashfull, ref matchType, verificationhashtablefull, verificationhashtable, expectedblocklist, ref expectedblockindex, this.multithreadCPU);
 
             if (matchType == MatchType.FullMatch)
             {
@@ -359,8 +1300,6 @@ namespace Par2NET
 
         public bool CreateTargetFiles()
         {
-            uint filenumber = 0;
-
             // Create any missing target files
             foreach (FileVerification fileVer in SourceFiles)
             {
@@ -541,7 +1480,7 @@ namespace Par2NET
             // Verify the target files in alphabetical order
             verifylist.Sort();
 
-            if (!multithread)
+            if (!multithreadIO)
             {
                 //ST
                 foreach (FileVerification fileVer in verifylist)
@@ -718,6 +1657,7 @@ namespace Par2NET
             catch (OutOfMemoryException oome)
             {
                 //cerr << "Could not allocate buffer memory." << endl;
+                Debug.WriteLine(oome);
                 return false;
             }
 
@@ -938,8 +1878,6 @@ namespace Par2NET
             return rv;
         }
 
-        private static object _syncObject = new object();
-
         private void RepairMissingBlockRange(uint blocklength, uint inputindex, uint aStartBlockNo, uint aEndBlockNo)
         {
             // This function runs in multiple threads.
@@ -947,49 +1885,38 @@ namespace Par2NET
             for (uint outputindex = aStartBlockNo; outputindex < aEndBlockNo; outputindex++)
             {
                 // Select the appropriate part of the output buffer
-                byte[] outbuf = new byte[blocklength];
-                //lock (_syncObject)
-                {
-                    Buffer.BlockCopy(outputbuffer, (int)(chunksize * outputindex), outbuf, 0, outbuf.Length);
-                }
+                //byte[] outbuf = new byte[blocklength];
+
+                //Buffer.BlockCopy(outputbuffer, (int)(chunksize * outputindex), outbuf, 0, outbuf.Length);
 
                 // Process the data
-                rs.Process(blocklength, inputindex, inputbuffer, outputindex, outbuf);
+                rs.Process(blocklength, inputindex, inputbuffer, outputindex, outputbuffer, (int)(chunksize * outputindex), blocklength);
+
+#if TRACE
+                //ToolKit.LogArrayToFile<byte>("outbuf." + inputindex + ".log", outbuf);
+#endif
+                //Buffer.BlockCopy(outbuf, 0, outputbuffer, (int)(chunksize * outputindex), outbuf.Length);              
+            }
+        }
+
+        private void RepairMissingBlockRange_orig(uint blocklength, uint inputindex, uint aStartBlockNo, uint aEndBlockNo)
+        {
+            // This function runs in multiple threads.
+            // For each output block
+            for (uint outputindex = aStartBlockNo; outputindex < aEndBlockNo; outputindex++)
+            {
+                // Select the appropriate part of the output buffer
+                byte[] outbuf = new byte[blocklength];
+
+                Buffer.BlockCopy(outputbuffer, (int)(chunksize * outputindex), outbuf, 0, outbuf.Length);
+
+                // Process the data
+                rs.Process_orig(blocklength, inputindex, inputbuffer, outputindex, outbuf);
 
 #if TRACE
                 ToolKit.LogArrayToFile<byte>("outbuf." + inputindex + ".log", outbuf);
 #endif
-
-                //using (StreamWriter sw = new StreamWriter(new FileStream(@"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\outbuf." + inputindex + ".log", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
-                //{
-                //    for (int i = 0; i < outbuf.Length; ++i)
-                //    {
-                //        byte b = outbuf[i];
-                //        sw.WriteLine("i={0},b={1}", i, b);
-                //    }
-                //}
-
-               // lock (_syncObject)
-                {
-                    Buffer.BlockCopy(outbuf, 0, outputbuffer, (int)(chunksize * outputindex), outbuf.Length);
-                }
-
-                //if (noiselevel > CommandLine::nlQuiet)
-                //{
-                //    // Update a progress indicator. This is thread-safe with a simple mutex
-                //    pthread_mutex_lock (&progressMutex);
-                //    progress += blocklength;
-                //    u32 newfraction = (u32)(1000 * progress / totaldata);
-
-                //    // Only report "Repairing" when a certain amount of progress has been made
-                //    // since last time, or when the progress is 100%
-                //    if ((newfraction - previouslyReportedProgress >= 10) || (newfraction == 1000))
-                //    {
-                //        cout << "Repairing: " << newfraction/10 << '.' << newfraction%10 << "%\r" << flush;
-                //        previouslyReportedProgress = newfraction;
-                //    }
-                //    pthread_mutex_unlock (&progressMutex);
-                //}
+                Buffer.BlockCopy(outbuf, 0, outputbuffer, (int)(chunksize * outputindex), outbuf.Length);
             }
         }
 
@@ -1051,8 +1978,6 @@ namespace Par2NET
                 }
                 return true;
             }
-
-            return true;
         }
 
         // Create a verification hash table for all files for which we have not

@@ -2,6 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Diagnostics;
+using System.Security.Cryptography;
+using System.IO;
 
 namespace Par2NET.Packets
 {
@@ -28,9 +31,8 @@ namespace Par2NET.Packets
         }
     }
 
-    public class FileVerificationPacket : IPar2Packet
+    public class FileVerificationPacket : CriticalPacket, IPar2Packet
     {
-        public PacketHeader header;
         // Body
         public byte[] fileid = new byte[16];            // MD5hash of file_hash_16k, file_length, file_name
         public List<FileVerificationEntry> entries;
@@ -40,6 +42,11 @@ namespace Par2NET.Packets
         public int GetSize()
         {
             return header.GetSize() + 16 * sizeof(byte) + (entries.Count * FileVerificationEntry.GetSize());
+        }
+
+        public override bool WritePacket(DiskFile diskfile, ulong offset)
+        {
+            return base.WritePacket(diskfile, offset, this.fileid, this.entries);
         }
 
         public static FileVerificationPacket Create(PacketHeader header, byte[] bytes, int index)
@@ -71,6 +78,71 @@ namespace Par2NET.Packets
             }
 
             return tmpPacket;
+        }
+
+        // Create a packet large enough for the specified number of blocks
+        internal static FileVerificationPacket Create(ulong _blockcount)
+        {
+            // Allocate a packet large enough to hold the required number of verification entries.
+            FileVerificationPacket tmpPacket = new FileVerificationPacket();
+            tmpPacket.blockcount = _blockcount;
+
+            // Record everything we know in the packet.
+            tmpPacket.header = new PacketHeader();
+            tmpPacket.header.magic = Par2FileReader.packet_magic;
+            tmpPacket.header.hash = new byte[16];
+            tmpPacket.header.setid = new byte[16];
+            tmpPacket.header.type = Par2FileReader.fileverificationpacket_type;
+
+            tmpPacket.fileid = new byte[16];
+            tmpPacket.entries = new List<FileVerificationEntry>((int)_blockcount);
+
+            tmpPacket.header.length = (ulong)tmpPacket.GetSize();
+
+            return tmpPacket;
+        }
+
+        internal void SetBlockHashAndCRC(uint blocknumber, byte[] hash, uint crc)
+        {
+            Debug.Assert(blocknumber < blockcount);
+
+            // Store the block hash and block crc in the packet.
+            //FileVerificationEntry entry = entries[(int)blocknumber];
+            FileVerificationEntry entry = new FileVerificationEntry();
+            entry.hash = hash;
+            entry.crc = crc;
+
+            entries.Add(entry);
+        }
+
+        public override void FinishPacket(byte[] setid)
+        {
+            header.setid = setid;
+
+            MD5 packetcontext = MD5.Create();
+
+            using (MemoryStream ms = new MemoryStream())
+            {
+                using (BinaryWriter bw = new BinaryWriter(ms))
+                {
+                    // PacketHeader section
+                    bw.Write(header.setid);
+                    bw.Write(header.type);
+
+                    //Packet section
+                    bw.Write(fileid);
+
+                    foreach (FileVerificationEntry entry in entries)
+                    {
+                        bw.Write(entry.hash);
+                        bw.Write(entry.crc);
+                    }
+
+                    byte[] buffer = ms.ToArray();
+
+                    header.hash = packetcontext.ComputeHash(buffer);
+                }
+            }
         }
     }
 }

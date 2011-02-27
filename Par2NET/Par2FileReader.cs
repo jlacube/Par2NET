@@ -14,21 +14,18 @@ namespace Par2NET
     {
         int buffer_size = 1048576;
 
-        byte[] packet_magic;
-        byte[] fileverificationpacket_type;
-        byte[] filedescriptionpacket_type;
-        byte[] mainpacket_type;
-        byte[] recoveryblockpacket_type;
-        byte[] creatorpacket_type;
+        public static byte[] packet_magic;
+        public static byte[] fileverificationpacket_type;
+        public static byte[] filedescriptionpacket_type;
+        public static byte[] mainpacket_type;
+        public static byte[] recoveryblockpacket_type;
+        public static byte[] creatorpacket_type;
 
         Par2RecoverySet par2RecoverySet;
         FileInfo fileInfo;
 
-        private Par2FileReader(Stream stream, bool multithread)
-            : base(stream)
+        static Par2FileReader()
         {
-            par2RecoverySet = new Par2RecoverySet(multithread);
-
             packet_magic = ToolKit.InitByteArrayFromChars('P', 'A', 'R', '2', '\0', 'P', 'K', 'T');
             fileverificationpacket_type = ToolKit.InitByteArrayFromChars('P', 'A', 'R', ' ', '2', '.', '0', '\0', 'I', 'F', 'S', 'C', '\0', '\0', '\0', '\0');
             filedescriptionpacket_type = ToolKit.InitByteArrayFromChars('P', 'A', 'R', ' ', '2', '.', '0', '\0', 'F', 'i', 'l', 'e', 'D', 'e', 's', 'c');
@@ -37,8 +34,16 @@ namespace Par2NET
             creatorpacket_type = ToolKit.InitByteArrayFromChars('P', 'A', 'R', ' ', '2', '.', '0', '\0', 'C', 'r', 'e', 'a', 't', 'o', 'r', '\0');
         }
 
-        public Par2FileReader(string filename, bool multithread)
-            : this(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read), multithread)
+        private Par2FileReader(Stream stream, bool multithreadCPU, bool multithreadIO)
+            : base(stream)
+        {
+            par2RecoverySet = new Par2RecoverySet(multithreadCPU, multithreadIO);
+
+            
+        }
+
+        public Par2FileReader(string filename, bool multithreadCPU, bool multithreadIO)
+            : this(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read, 10*1024*1024, FileOptions.Asynchronous), multithreadCPU, multithreadIO)
         {
             fileInfo = new FileInfo(filename);
         }

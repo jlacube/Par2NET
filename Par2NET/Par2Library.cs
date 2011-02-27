@@ -11,12 +11,18 @@ using System.Globalization;
 using System.Security.Cryptography;
 using Par2NET.Interfaces;
 using System.Threading;
+using Par2NET.Packets;
+using System.Reflection;
 
 namespace Par2NET
 {
     public class Par2Library : IParLibrary
     {
-        public bool multithread = false;
+        public static readonly string PACKAGE = "Par2NET.Library";
+        public static readonly string VERSION = Assembly.GetExecutingAssembly().ImageRuntimeVersion;
+
+        public bool multithreadCPU = false;
+        public bool multithreadIO = false;
 
         private static string targetPath = string.Empty;
         private static NoiseLevel noiseLevel = NoiseLevel.Normal;
@@ -47,9 +53,15 @@ namespace Par2NET
             return par1Library;
         }
 
-        public Par2Library(bool _multithread)
+        public Par2Library(bool _multithreadCPU, bool _multithreadIO)
         {
-            multithread = _multithread;
+            multithreadCPU = _multithreadCPU;
+            multithreadIO = _multithreadIO;
+        }
+
+        public Par2Library()
+            : this(true, false)
+        {
         }
 
         private Dictionary<string, Par2RecoverySet> setids = new Dictionary<string, Par2RecoverySet>();
@@ -108,7 +120,7 @@ namespace Par2NET
             switch (args.action)
             {
                 case ParAction.ParCreate:
-                    return Create(ref inputFiles, ref recoveryFiles);
+                    return Create(ref inputFiles, ref recoveryFiles, args);
                 case ParAction.ParRepair:
                     return Repair(ref inputFiles, ref recoveryFiles);
                 case ParAction.ParVerify:
@@ -151,9 +163,128 @@ namespace Par2NET
             recoveryFiles.Sort();
         }
 
-        private ParResult Create(ref List<string> inputFiles, ref List<string> recoveryFiles)
+        private ParResult Create(ref List<string> inputFiles, ref List<string> recoveryFiles, Par2LibraryArguments args)
         {
-            throw new NotImplementedException();
+            // Initialize the base par2 filename if not set in the command line
+            if (args.par2filename == string.Empty)
+            {
+                //args.par2filename = args.inputFiles[0] + ".par2";
+                args.par2filename = args.inputFiles[0];
+            }
+
+            Par2RecoverySet recoverySet = new Par2RecoverySet(args.multithreadCPU, args.multithreadIO, args);
+
+            // Compute block size from block count or vice versa depending on which was
+            // specified on the command line
+            if (!recoverySet.ComputeBlockSizeAndBlockCount(ref inputFiles))
+                return ParResult.InvalidCommandLineArguments;
+
+            // Determine how many recovery blocks to create based on the source block
+            // count and the requested level of redundancy.
+            if (recoverySet.redundancy > 0 && !recoverySet.ComputeRecoveryBlockCount(recoverySet.redundancy))
+                return ParResult.InvalidCommandLineArguments;
+
+            // Determine how much recovery data can be computed on one pass
+            if (!recoverySet.CalculateProcessBlockSize(GetMemoryLimit()))
+                return ParResult.LogicError;
+
+            // Determine how many recovery files to create.
+            if (!recoverySet.ComputeRecoveryFileCount())
+                return ParResult.InvalidCommandLineArguments;
+
+            //if (noiselevel > CommandLine::nlQuiet)
+            //{
+            // Display information.
+            Console.WriteLine("Block size: " + recoverySet.MainPacket.blocksize);
+            Console.WriteLine("Source file count: " + recoverySet.SourceFiles.Count);
+            Console.WriteLine("Source block count: " + recoverySet.sourceblockcount);
+            if (recoverySet.redundancy > 0 || recoverySet.recoveryblockcount == 0)
+                Console.WriteLine("Redundancy: " + recoverySet.redundancy + '%');
+            Console.WriteLine("Recovery block count: " + recoverySet.recoveryblockcount);
+            Console.WriteLine("Recovery file count: " + recoverySet.recoveryfilecount);
+            //}
+
+            // Open all of the source files, compute the Hashes and CRC values, and store
+            // the results in the file verification and file description packets.
+            if (!recoverySet.OpenSourceFiles(ref inputFiles))
+                return ParResult.FileIOError;
+
+            // Create the main packet and determine the setid to use with all packets
+            //if (!recoverySet.CreateMainPacket(Par2LibraryArguments args))
+            //  return ParResult.LogicError;
+
+            // Create the creator packet.
+            if (!recoverySet.CreateCreatorPacket())
+                return ParResult.LogicError;
+
+            // Initialise all of the source blocks ready to start reading data from the source files.
+            if (!recoverySet.CreateSourceBlocks())
+                return ParResult.LogicError;
+
+            // Create all of the output files and allocate all packets to appropriate file offets.
+            if (!recoverySet.InitialiseOutputFiles(args.par2filename))
+                return ParResult.FileIOError;
+
+            if (recoverySet.recoveryblockcount > 0)
+            {
+                // Allocate memory buffers for reading and writing data to disk.
+                if (!recoverySet.AllocateBuffers())
+                    return ParResult.MemoryError;
+
+                // Compute the Reed Solomon matrix
+                if (!recoverySet.ComputeRSMatrix())  //TODO: Unify and switch for Create and Verify/Repair
+                    return ParResult.LogicError;
+
+                // Set the total amount of data to be processed.
+                /*progress = 0;
+                totaldata = blocksize * sourceblockcount * recoveryblockcount;
+                previouslyReportedFraction = -10000000;	// Big negative*/
+
+                // Start at an offset of 0 within a block.
+                ulong blockoffset = 0;
+                while (blockoffset < recoverySet.MainPacket.blocksize) // Continue until the end of the block.
+                {
+                    // Work out how much data to process this time.
+                    ulong blocklength = (ulong)Math.Min(recoverySet.chunksize, recoverySet.MainPacket.blocksize - blockoffset);
+
+                    // Read source data, process it through the RS matrix and write it to disk.
+                    if (!recoverySet.ProcessData(blockoffset, blocklength))
+                        return ParResult.FileIOError;
+
+                    blockoffset += blocklength;
+                }
+
+                //if (noiselevel > CommandLine::nlQuiet)
+                //  cout << "Writing recovery packets" << endl;
+
+                // Finish computation of the recovery packets and write the headers to disk.
+                if (!recoverySet.WriteRecoveryPacketHeaders())
+                    return ParResult.FileIOError;
+
+                // Finish computing the full file hash values of the source files
+                if (!recoverySet.FinishFileHashComputation())
+                    return ParResult.LogicError;
+            }
+
+            // Fill in all remaining details in the critical packets.
+            if (!recoverySet.FinishCriticalPackets())
+                return ParResult.LogicError;
+
+            //if (noiselevel > CommandLine::nlQuiet)
+            //  cout << "Writing verification packets" << endl;
+
+            // Write all other critical packets to disk.
+            if (!recoverySet.WriteCriticalPackets())
+                return ParResult.FileIOError;
+
+            // Close all files.
+            if (!recoverySet.CloseFiles())
+                return ParResult.FileIOError;
+
+            //if (noiselevel > CommandLine::nlSilent)
+            //  cout << "Done" << endl;
+
+            return ParResult.Success;
         }
 
         private ParResult Repair(ref List<string> inputFiles, ref List<string> recoveryFiles)
@@ -258,35 +389,32 @@ namespace Par2NET
 
         private ParResult Verify(ref List<string> inputFiles, ref List<string> recoveryFiles)
         {
-            //FastGaloisFields.GaloisTables.GaloisTable16 GT16 = new FastGaloisFields.GaloisTables.GaloisTable16(16, 0x1100B);
-
             try
             {
-                //if (!multithread)
-                if (false)
+                if (!multithreadIO)
                 {
                     //ST
                     foreach (string recoveryFile in recoveryFiles)
                     {
-                        Par2FileReader reader = new Par2FileReader(recoveryFile, multithread);
+                        Par2FileReader reader = new Par2FileReader(recoveryFile, multithreadCPU, multithreadIO);
                         UpdateOrAddRecoverySet(reader.ReadRecoverySet());
                     }
                 }
                 else
                 {
                     //MT : OK
-                    using (SemaphoreSlim concurrencySemaphore = new SemaphoreSlim(4))
+                    using (Semaphore concurrencySemaphore = new Semaphore(0,4))
                     {
                         List<Task> tasks = new List<Task>();
                         foreach (string recoveryFile in recoveryFiles)
                         {
-                            concurrencySemaphore.Wait();
+                            concurrencySemaphore.WaitOne();
                             tasks.Add(Task.Factory.StartNew((f) =>
                             {
                                 try
                                 {
                                     string file = (string)f;
-                                    Par2FileReader reader = new Par2FileReader(file, multithread);
+                                    Par2FileReader reader = new Par2FileReader(file, multithreadCPU, multithreadIO);
                                     UpdateOrAddRecoverySet(reader.ReadRecoverySet());
                                 }
                                 finally

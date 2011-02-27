@@ -25,8 +25,8 @@ namespace FastGaloisFields
 
         private uint parpresent = 0;        // Number of output blocks that are present
         private uint parmissing = 0;        // Number of output blocks that are missing
-        private uint parpresentindex = 0;   // The index numbers of the output blocks that are present
-        private uint parmissingindex = 0;   // The index numbers of the output blocks that are missing
+        //private uint parpresentindex = 0;   // The index numbers of the output blocks that are present
+        //private uint parmissingindex = 0;   // The index numbers of the output blocks that are missing
 
         List<RSOutputRow> outputrows = new List<RSOutputRow>();   // Details of the output blocks
 
@@ -43,7 +43,7 @@ namespace FastGaloisFields
             glmt = new GaloisLongMultiplyTable16();
         }
 
-        public bool Process(uint size, uint inputindex, byte[] inputbuffer, uint outputindex, byte[] outputbuffer)
+        public bool Process(uint size, uint inputindex, byte[] inputbuffer, uint outputindex, byte[] outputbuffer, int startIndex, uint length)
         {
             // Optimization: it occurs frequently the function exits early on, so inline the start.
             // This resulted in a speed gain of approx. 8% in repairing.
@@ -55,7 +55,22 @@ namespace FastGaloisFields
             if (factor.Value == 0)
                 return true;
 
-            return InternalProcess(factor, size, inputbuffer, outputbuffer);
+            return InternalProcess(factor, size, inputbuffer, outputbuffer, startIndex, length);
+        }
+
+        public bool Process_orig(uint size, uint inputindex, byte[] inputbuffer, uint outputindex, byte[] outputbuffer)
+        {
+            // Optimization: it occurs frequently the function exits early on, so inline the start.
+            // This resulted in a speed gain of approx. 8% in repairing.
+
+            // Look up the appropriate element in the RS matrix
+            Galois16 factor = leftmatrix[outputindex * (datapresent + datamissing) + inputindex];
+
+            // Do nothing if the factor happens to be 0
+            if (factor.Value == 0)
+                return true;
+
+            return InternalProcess_orig(factor, size, inputbuffer, outputbuffer);
         }
 
         private bool InternalProcessSafe(Galois16 factor, uint size, byte[] inputbuffer, byte[] outputbuffer)
@@ -95,20 +110,49 @@ namespace FastGaloisFields
             }
             catch (Exception ex)
             {
+                Debug.WriteLine(ex);
                 return false;
             }
         }
 
-        private bool InternalProcess(Galois16 factor, uint size, byte[] inputbuffer, byte[] outputbuffer)
+        private bool InternalProcess(Galois16 factor, uint size, byte[] inputbuffer, byte[] outputbuffer, int startIndex, uint length)
         {
             // Rewrite : TPL ?
             // Rewrite : Dynamic load FastGaloisFieldsUnsafe
+
+            //FastGaloisFieldsSafeProcessor safeProcessor = new FastGaloisFieldsSafeProcessor();
+            //return safeProcessor.InternalProcess(factor, size, inputbuffer, outputbuffer);
+
             try
             {
                 FastGaloisFieldsUnsafeProcessor unsafeProcessor = new FastGaloisFieldsUnsafeProcessor();
-                return unsafeProcessor.InternalProcess(factor, size, inputbuffer, outputbuffer);
+                return unsafeProcessor.InternalProcess(factor, size, inputbuffer, outputbuffer, startIndex, length);
             }
-            catch (SecurityException se)
+            catch (SecurityException)
+            {
+                return InternalProcessSafe(factor, size, inputbuffer, outputbuffer);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+                return false;
+            }
+        }
+
+        private bool InternalProcess_orig(Galois16 factor, uint size, byte[] inputbuffer, byte[] outputbuffer)
+        {
+            // Rewrite : TPL ?
+            // Rewrite : Dynamic load FastGaloisFieldsUnsafe
+
+            //FastGaloisFieldsSafeProcessor safeProcessor = new FastGaloisFieldsSafeProcessor();
+            //return safeProcessor.InternalProcess(factor, size, inputbuffer, outputbuffer);
+
+            try
+            {
+                FastGaloisFieldsUnsafeProcessor unsafeProcessor = new FastGaloisFieldsUnsafeProcessor();
+                return unsafeProcessor.InternalProcess_orig(factor, size, inputbuffer, outputbuffer);
+            }
+            catch (SecurityException)
             {
                 return InternalProcessSafe(factor, size, inputbuffer, outputbuffer);
             }
@@ -139,7 +183,7 @@ namespace FastGaloisFields
             return true;
         }
 
-        internal bool SetOutput(bool present, ushort lowexponent, ushort highexponent)
+        public bool SetOutput(bool present, ushort lowexponent, ushort highexponent)
         {
             for (uint exponent = lowexponent; exponent <= highexponent; exponent++)
             {
@@ -152,6 +196,9 @@ namespace FastGaloisFields
 
         public static void LogArrayToFile<T>(string filename, T[] array)
         {
+            if (array == null)
+                return;
+
             using (StreamWriter sw = new StreamWriter(new FileStream(filename, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
             {
                 for (int i = 0; i < array.Length; ++i)
@@ -216,7 +263,7 @@ namespace FastGaloisFields
 
         // Record that the specified number of source files are all present
         // and compute the base values to use for the vandermonde matrix.
-        internal bool SetInput(uint count)
+        public bool SetInput(uint count)
         {
             inputcount = count;
 
@@ -249,6 +296,10 @@ namespace FastGaloisFields
 
                 database[index] = ibase;
             }
+
+#if TRACE
+            LogArrayToFile<ushort>(@"database.log", database);
+#endif
 
             return true;
         }
@@ -312,7 +363,7 @@ namespace FastGaloisFields
             // Fill in the two matrices:
 
             // One row for each present recovery block that will be used for a missing data block
-            for (uint row = 0; row < outputrows.Count; row++)
+            for (uint row = 0; row < datamissing; row++)
             {
                 RSOutputRow outputrow = outputrows[(int)row];
 
@@ -327,7 +378,9 @@ namespace FastGaloisFields
 
                 // Get the exponent of the next present recovery block
                 while (!outputrow.present)
-                    row++;
+                {
+                    outputrow = outputrows[(int)++row];
+                }
 
                 ushort exponent = outputrow.exponent;
 

@@ -15,6 +15,17 @@ namespace Par2NET.Console
 {
     class Program
     {
+        /*
+         Repair commandline /mt- /rf:"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\Tests\EntLib50.par2" /action:ParRepair
+         
+         * 
+         * Create commandline /if:"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\CreateTests\EntLib50.chm" /action:ParCreate /rbc:10 /mtcpu- /mtio-
+         * 
+         * 
+         * /mtio- /mtcpu- /a:ParVerify /rf:\\VBOXSVR\SharedFolders\Tests\5150.Rue.Des.Ormes.LIMITED.FRENCHDVDRIP.XVID.AC3-TBoss\5150.par2
+         * 
+         * 
+         */
         static void Main(string[] args)
         {
             Par2LibraryArguments par2args = new Par2LibraryArguments();
@@ -25,7 +36,7 @@ namespace Par2NET.Console
             switch (par2args.action)
             {
                 case ParAction.ParCreate:
-                    if (par2args.inputFiles.Length == 0)
+                    if (par2args.inputFiles.Length == 0 || (par2args.redundancy == -1 && par2args.recoveryblockcount == -1))
                     {
                         Parser.ArgumentsUsage(par2args.GetType());
                         return;
@@ -41,13 +52,18 @@ namespace Par2NET.Console
                     break;
             }
 
-            Par2Library library = new Par2Library(par2args.multithread);
+            Par2Library library = new Par2Library(par2args.multithreadCPU, par2args.multithreadIO);
 
             List<string> inputFiles = new List<string>(par2args.inputFiles);
             List<string> recoveryFiles = new List<string>(par2args.recoveryFiles);
 
             if (string.IsNullOrEmpty(par2args.targetPath))
-                par2args.targetPath = Path.GetDirectoryName(par2args.recoveryFiles[0]);
+            {
+                if (par2args.action == ParAction.ParCreate)
+                    par2args.targetPath = Path.GetDirectoryName(par2args.inputFiles[0]);
+                else
+                    par2args.targetPath = Path.GetDirectoryName(par2args.recoveryFiles[0]);
+            }
 
 #if TimeTrack
             DateTime startTime = DateTime.Now;
@@ -104,45 +120,6 @@ namespace Par2NET.Console
             //        FILEDESCRIPTIONPACKET packet = ToolKit.ReadPacket(bytes, index, (int)header.length);
             //    }
             //}
-        }
-
-
-        static void MainOld(string[] args)
-        {
-            int nbTasks = 30;
-
-            //MD5
-
-            DateTime startTime = DateTime.Now;
-
-            List<Task> tasks = new List<Task>();
-
-            for (int i = 0; i < nbTasks; i++)
-            {
-                tasks.Add(TasksHelper.VerifyMD5HashStr(@"C:\Users\Jerome\Documents\GRMWDK_EN_7600_1.iso", "8fe981a1706d43ad34bda496e6558f94"));
-            }
-
-            Task.WaitAll(tasks.ToArray());
-
-            TimeSpan duration = DateTime.Now - startTime;
-            System.Console.WriteLine("{3} MD5 Hash : {0}m{1}s{2}ms", duration.Minutes, duration.Seconds, duration.Milliseconds, nbTasks);
-
-
-            //CRC32
-
-            tasks.Clear();
-
-            startTime = DateTime.Now;
-
-            for (int i = 0; i < nbTasks; i++)
-            {
-                tasks.Add(TasksHelper.VerifyCRC32HashStr(@"C:\Users\Jerome\Documents\GRMWDK_EN_7600_1.iso", "8fe981a1706d43ad34bda496e6558f94"));
-            }
-
-            Task.WaitAll(tasks.ToArray());
-
-            duration = DateTime.Now - startTime;
-            System.Console.WriteLine("{3} CRC32 Hash : {0}m{1}s{2}ms", duration.Minutes, duration.Seconds, duration.Milliseconds, nbTasks);
         }
     }
 }

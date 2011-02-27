@@ -78,8 +78,6 @@ namespace Par2NET
 
         public static bool SafeCompare(byte[] a1, byte[] a2)
         {
-            int found = 0;
-
             if (a1.Length != a2.Length)
                 return false;
 

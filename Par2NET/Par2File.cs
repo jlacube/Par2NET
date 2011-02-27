@@ -23,7 +23,7 @@ namespace Par2NET
         public Par2File()
             : this(string.Empty)
         {
-            System.IO.BinaryWriter br;
+            //System.IO.BinaryWriter br;
         }
 
         public Par2File(string filename)

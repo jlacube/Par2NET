@@ -2,6 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Par2NET.Interfaces;
+using System.Security.Cryptography;
+using System.IO;
 
 namespace Par2NET.Packets
 {
@@ -15,9 +18,8 @@ namespace Par2NET.Packets
     // of recoverable files. The extra entries correspond to files that were not
     // used during the creation of the recovery files and which may not therefore
     // be repaired if they are found to be damaged.
-    public class MainPacket : IPar2Packet
+    public class MainPacket : CriticalPacket, IPar2Packet
     {
-        public PacketHeader header;
         public UInt64 blocksize;
         public UInt32 recoverablefilecount;
         public UInt32 totalfilecount;
@@ -26,6 +28,27 @@ namespace Par2NET.Packets
         public int GetSize()
         {
             return header.GetSize() + sizeof(UInt64) + sizeof(UInt32) + (16 * sizeof(byte) * fileids.Count );
+        }
+
+        public override bool WritePacket(DiskFile diskfile, ulong offset)
+        {
+            return base.WritePacket(diskfile, offset, this.blocksize, this.recoverablefilecount, this.fileids);
+        }
+
+        public static MainPacket Create(Par2LibraryArguments args)
+        {
+            MainPacket tmpPacket = new MainPacket();
+            tmpPacket.header = new PacketHeader();
+            tmpPacket.header.setid = new byte[16];
+            tmpPacket.header.magic = Par2FileReader.packet_magic;
+            tmpPacket.header.type = Par2FileReader.mainpacket_type;
+
+            tmpPacket.blocksize = (ulong)args.blocksize;
+            tmpPacket.recoverablefilecount = (uint)args.recoveryfilecount;
+            tmpPacket.fileids = new List<byte[]>();
+            tmpPacket.header.length = (ulong)(tmpPacket.GetSize() + (16 * sizeof(byte) * args.inputFiles.Length));
+
+            return tmpPacket;
         }
 
         public static MainPacket Create(PacketHeader header, byte[] bytes, int index)
@@ -56,6 +79,36 @@ namespace Par2NET.Packets
             }, tmpPacket.blocksize);
 
             return tmpPacket;
+        }
+
+        public override void FinishPacket(byte[] setid)
+        {
+            header.setid = setid;
+
+            MD5 packetcontext = MD5.Create();
+
+            using (MemoryStream ms = new MemoryStream())
+            {
+                using (BinaryWriter bw = new BinaryWriter(ms))
+                {
+                    // PacketHeader section
+                    bw.Write(header.setid);
+                    bw.Write(header.type);
+
+                    //Packet section
+                    bw.Write(blocksize);
+                    bw.Write(recoverablefilecount);
+
+                    foreach (byte[] fileid in fileids)
+                    {
+                        bw.Write(fileid);
+                    }
+
+                    byte[] buffer = ms.ToArray();
+
+                    header.hash = packetcontext.ComputeHash(buffer);
+                }
+            }
         }
     }
 }

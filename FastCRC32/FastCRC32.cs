@@ -9,7 +9,6 @@ namespace FastCRC32
     {
         private readonly static uint[] crcTable = null;
         private static uint[] windowTable = null;
-        private static uint maskwindow = 0;
         private static bool not_init = true;
 
         public uint windowMask = 0;

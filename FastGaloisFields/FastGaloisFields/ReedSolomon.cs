@@ -68,7 +68,7 @@ namespace FastGaloisFields
 
             // Solve one row at a time
 
-            int progress = 0;
+            //int progress = 0;
 
             // For each row in the matrix
             for (uint row = 0; row < datamissing; row++)
