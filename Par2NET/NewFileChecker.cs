@@ -148,10 +148,6 @@ namespace Par2NET
             //int THRESHOLD = ((int)((50 * 1024 * 1024) / blocksize) * blocksize); // 50Mo threshold
             int THRESHOLD = 5 * blocksize;
 
-            // Rewrite with :
-            //  <= 50Mo, one step full buffer
-            // > 50 Mo, two buffer 50Mo with 2*blocksize overlap
-
             matchType = MatchType.FullMatch;
 
             Console.WriteLine("Checking file '{0}'", Path.GetFileName(filename));
@@ -251,7 +247,7 @@ namespace Par2NET
                 else
                 {
                     int buffer_size = THRESHOLD;
-                    int overlap = 2 * blocksize; // part which will be check in double to avoid missing moving blocks
+                    int overlap = 1 * blocksize; // part which will be check in double to avoid missing moving blocks
 
                     using (FileStream fs = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read))
                     {
