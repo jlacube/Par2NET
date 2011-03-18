@@ -92,12 +92,23 @@ namespace Par2NET
 
         public static void LogArrayToFile<T>(string filename, T[] array)
         {
+            if (array == null)
+                return;
+
             using (StreamWriter sw = new StreamWriter(new FileStream(filename, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
             {
                 for (int i = 0; i < array.Length; ++i)
                 {
                     sw.WriteLine("index={0},data={1}", i, array[i].ToString());
                 }
+            }
+        }
+
+        public static void LogToFile(string filename, string str)
+        {
+            using (StreamWriter sw = new StreamWriter(new FileStream(filename, FileMode.Append, FileAccess.Write, FileShare.None)))
+            {
+                sw.WriteLine(str);
             }
         }
 

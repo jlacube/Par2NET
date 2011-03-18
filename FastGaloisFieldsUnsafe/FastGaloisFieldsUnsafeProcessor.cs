@@ -14,8 +14,8 @@ namespace FastGaloisFieldsUnsafe
         {
             try
             {
-                GCHandle inputGCH = GCHandle.Alloc(inputbuffer);
-                IntPtr inputPtr = GCHandle.ToIntPtr(inputGCH);
+                //GCHandle inputGCH = GCHandle.Alloc(inputbuffer);
+                //IntPtr inputPtr = GCHandle.ToIntPtr(inputGCH);
 
                 unsafe
                 {

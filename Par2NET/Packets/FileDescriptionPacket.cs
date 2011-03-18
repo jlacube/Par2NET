@@ -68,7 +68,7 @@ namespace Par2NET.Packets
         {
             // Allocate some extra bytes for the packet in memory so that strlen() can
             // be used on the filename. The extra bytes do not get written to disk.
-            string pad = new string(new char[filename.Length % 4]);
+            string pad = filename.Length % 4 == 0 ? "" : new string(new char[4 - (filename.Length % 4)]);
 
             FileDescriptionPacket tmpPacket = new FileDescriptionPacket();
             tmpPacket.header = new PacketHeader();
@@ -82,6 +82,8 @@ namespace Par2NET.Packets
             tmpPacket.hash16k = new byte[16];
             tmpPacket.length = filesize;
 
+            tmpPacket.header.length = (ulong)tmpPacket.GetSize();
+
             return tmpPacket;
         }
 
@@ -93,7 +95,7 @@ namespace Par2NET.Packets
                 {
                     bw.Write(hash16k);
                     bw.Write(length);
-                    bw.Write(name);
+                    bw.Write(Encoding.UTF8.GetBytes(name));
                 }
 
                 byte[] buffer = ms.ToArray();
@@ -122,7 +124,7 @@ namespace Par2NET.Packets
                     bw.Write(hashfull);
                     bw.Write(hash16k);
                     bw.Write(length);
-                    bw.Write(name);
+                    bw.Write(Encoding.UTF8.GetBytes(name));
 
                     byte[] buffer = ms.ToArray();
 

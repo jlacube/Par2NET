@@ -9,7 +9,7 @@ namespace Par2NET
 {
     public class DiskFile
     {
-        private string filename = string.Empty;
+        /*private*/public string filename = string.Empty;
         private ulong filesize = 0;
         private FileStream hFile = null;
         private ulong offset = 0;
@@ -206,6 +206,13 @@ namespace Par2NET
             {
                 Debug.WriteLine(ex);
                 return false;
+            }
+
+            ToolKit.LogToFile(@"diskfile.log", string.Format("filename={0},offset={1},length={2}", filename, _offset, length));
+
+            if (filename.Contains("EntLib50.chm.par2"))
+            {
+                ToolKit.LogArrayToFile<byte>("dump.log", buffer);
             }
 
             offset += length;

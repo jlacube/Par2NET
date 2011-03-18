@@ -156,5 +156,10 @@ namespace FastGaloisFields
                 return a.table.antilog[sum];
             }
         }
+
+        public override string ToString()
+        {
+            return this.Value.ToString();
+        }
     }
 }

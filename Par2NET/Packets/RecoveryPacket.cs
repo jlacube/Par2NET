@@ -28,7 +28,7 @@ namespace Par2NET.Packets
 
         public ulong PacketLength()
         {
-            return header.length;
+            return (ulong)length;
         }
 
         public static RecoveryPacket Create(PacketHeader header, byte[] bytes, int index, string filename, int file_offset)
@@ -78,7 +78,8 @@ namespace Par2NET.Packets
 
             tmpPacket.exponent = exponent;
 
-            tmpPacket.length = 0; //
+            //tmpPacket.length = 0; //
+            tmpPacket.length = (int)(tmpPacket.header.GetSize() + sizeof(UInt32) + (int)blocksize);
 
             // Start computation of the packet hash
             tmpPacket.packetcontext = MD5.Create();

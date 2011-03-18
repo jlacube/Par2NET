@@ -45,8 +45,9 @@ namespace Par2NET.Packets
 
         public static CreatorPacket Create(byte[] setid)
         {
-            string creator = string.Format("Created by {0} version {1}.", Par2Library.PACKAGE, Par2Library.VERSION);
-            string pad = new string(new char[creator.Length % 4]);
+            //string creator = string.Format("Created by {0} version {1}.", Par2Library.PACKAGE, Par2Library.VERSION);
+            string creator = "Created by par2cmdline version 0.4.";
+            string pad = new string(new char[4 - (creator.Length % 4)]);
 
             CreatorPacket tmpPacket = new CreatorPacket();
 

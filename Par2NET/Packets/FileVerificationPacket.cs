@@ -97,7 +97,7 @@ namespace Par2NET.Packets
             tmpPacket.fileid = new byte[16];
             tmpPacket.entries = new List<FileVerificationEntry>((int)_blockcount);
 
-            tmpPacket.header.length = (ulong)tmpPacket.GetSize();
+            tmpPacket.header.length = (ulong)tmpPacket.GetSize() + (_blockcount * (ulong)FileVerificationEntry.GetSize());
 
             return tmpPacket;
         }

@@ -17,12 +17,18 @@ namespace Par2NET.Packets
             return header.length;
         }
 
+        // C# to convert a string to a byte array.
+        private byte[] StrToByteArray(string str)
+        {
+            return Encoding.UTF8.GetBytes(str);
+        }
+
         private void WriteObject(BinaryWriter bw, object obj)
         {
             switch (obj.GetType().ToString().ToLower())
             {
                 case "system.string":
-                    bw.Write((string)obj);
+                    bw.Write(StrToByteArray((string)obj));
                     break;
                 case "system.uint64":
                 case "system.ulong":

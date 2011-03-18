@@ -97,7 +97,6 @@ namespace FastCRC32
         {
             unchecked
             {
-                //uint result = ~0;
                 if (not_init)
                 {
                     uint result = 0xFFFFFFFF;    

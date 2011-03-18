@@ -44,9 +44,11 @@ namespace Par2NET.Packets
             tmpPacket.header.type = Par2FileReader.mainpacket_type;
 
             tmpPacket.blocksize = (ulong)args.blocksize;
-            tmpPacket.recoverablefilecount = (uint)args.recoveryfilecount;
+            tmpPacket.recoverablefilecount = (uint)args.inputFiles.Length;
             tmpPacket.fileids = new List<byte[]>();
             tmpPacket.header.length = (ulong)(tmpPacket.GetSize() + (16 * sizeof(byte) * args.inputFiles.Length));
+
+            // setid calculation and fileids insertion will occur in Par2RecoverySet.OpenSourceFiles method
 
             return tmpPacket;
         }

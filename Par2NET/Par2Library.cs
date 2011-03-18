@@ -213,6 +213,8 @@ namespace Par2NET
             //if (!recoverySet.CreateMainPacket(Par2LibraryArguments args))
             //  return ParResult.LogicError;
 
+            recoverySet.criticalpackets.Add(recoverySet.MainPacket);
+
             // Create the creator packet.
             if (!recoverySet.CreateCreatorPacket())
                 return ParResult.LogicError;
@@ -240,6 +242,8 @@ namespace Par2NET
                 totaldata = blocksize * sourceblockcount * recoveryblockcount;
                 previouslyReportedFraction = -10000000;	// Big negative*/
 
+                //Par2RecoverySet.LogArrayToFile<byte>(@"outputbuffer.before.createparityblocks.log", recoverySet.outputbuffer);
+
                 // Start at an offset of 0 within a block.
                 ulong blockoffset = 0;
                 while (blockoffset < recoverySet.MainPacket.blocksize) // Continue until the end of the block.
@@ -253,6 +257,8 @@ namespace Par2NET
 
                     blockoffset += blocklength;
                 }
+
+                //Par2RecoverySet.LogArrayToFile<byte>(@"outputbuffer.after.createparityblocks.log", recoverySet.outputbuffer);
 
                 //if (noiselevel > CommandLine::nlQuiet)
                 //  cout << "Writing recovery packets" << endl;
@@ -382,9 +388,9 @@ namespace Par2NET
         private ulong GetMemoryLimit()
         {
             //TODO : to rewrite
-            // Assume 128 MB
+            // Assume 1024 MB
 
-            return 128 * 1048576;
+            return 1024 * 1048576;
         }
 
         private ParResult Verify(ref List<string> inputFiles, ref List<string> recoveryFiles)

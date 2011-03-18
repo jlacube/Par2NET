@@ -457,7 +457,7 @@ namespace FastGaloisFields
                     }
                 }
 
-                row++;
+                //row++;
             }
 
 #if TRACE

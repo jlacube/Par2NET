@@ -10,6 +10,7 @@ using FastGaloisFields;
 using System.Threading.Tasks;
 using System.Threading;
 using System.Diagnostics;
+using System.Security.Cryptography;
 
 namespace Par2NET
 {
@@ -62,7 +63,7 @@ namespace Par2NET
         private ulong largestfilesize = 0;
         private DiskFile[] recoveryfiles = null;
 
-        private List<IPar2Packet> criticalpackets = new List<IPar2Packet>();
+        public List<IPar2Packet> criticalpackets = new List<IPar2Packet>();
 
         private List<CriticalPacketEntry> criticalpacketentries = new List<CriticalPacketEntry>();
 
@@ -427,9 +428,53 @@ namespace Par2NET
 
                 SourceFiles.Add(fileVer);
 
+                if (!mainpacket.fileids.Contains(fileVer.FileDescriptionPacket.fileid))
+                    mainpacket.fileids.Add(fileVer.FileDescriptionPacket.fileid);
+
                 fileVer.Close();
             }
 
+            // Compute setid MD5 hash
+            MD5 setidcontext = MD5.Create();
+            using (MemoryStream ms = new MemoryStream())
+            {
+                using (BinaryWriter bw = new BinaryWriter(ms))
+                {
+                    bw.Write(mainpacket.blocksize);
+                    bw.Write(mainpacket.recoverablefilecount);
+
+                    foreach (byte[] fileid in mainpacket.fileids)
+                    {
+                        bw.Write(fileid);
+                    }
+                    
+                    byte[] buffer = ms.ToArray();
+
+                    mainpacket.header.setid = setidcontext.ComputeHash(buffer);
+                }
+            }
+
+            // Compute mainpacket hash MD5 hash
+            MD5 hashcontext = MD5.Create();
+            using (MemoryStream ms = new MemoryStream())
+            {
+                using (BinaryWriter bw = new BinaryWriter(ms))
+                {
+                    bw.Write(mainpacket.header.setid);
+                    bw.Write(mainpacket.header.type);
+                    bw.Write(mainpacket.blocksize);
+                    bw.Write(mainpacket.recoverablefilecount);
+
+                    foreach (byte[] fileid in mainpacket.fileids)
+                    {
+                        bw.Write(fileid);
+                    }
+
+                    byte[] buffer = ms.ToArray();
+
+                    mainpacket.header.hash = setidcontext.ComputeHash(buffer);
+                }
+            }
 
             return true;
         }
@@ -442,7 +487,7 @@ namespace Par2NET
             mainpacket = MainPacket.Create(args);
 
             // Add the main packet to the list of critical packets.
-            criticalpackets.Add(mainpacket);
+            //criticalpackets.Add(mainpacket);
             
             return true;
         }
@@ -798,9 +843,13 @@ namespace Par2NET
                     sourcefile.UpdateHashes(sourceindex, inputbuffer, blocklength);
                 }
 
+                //LogArrayToFile<byte>(@"outputbuffer.before.createparityblocks.log", outputbuffer);
+
                 // Function that does the subtask in multiple threads if appropriate.
                 if (!CreateParityBlocks(blocklength, inputblock))
                     return false;
+
+                //LogArrayToFile<byte>(@"outputbuffer.after.createparityblocks.log", outputbuffer);
 
                 // Work out which source file the next block belongs to
                 if (++sourceindex >= sourcefile.BlockCount())
@@ -836,6 +885,20 @@ namespace Par2NET
             return true;
         }
 
+        //public static void LogArrayToFile<T>(string filename, T[] array)
+        //{
+        //    if (array == null)
+        //        return;
+
+        //    using (StreamWriter sw = new StreamWriter(new FileStream(filename, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None)))
+        //    {
+        //        for (int i = 0; i < array.Length; ++i)
+        //        {
+        //            sw.WriteLine("index={0},data={1}", i, array[i].ToString());
+        //        }
+        //    }
+        //}
+
         private bool CreateParityBlocks(ulong blocklength, uint inputindex)
         {
             // Used from within ProcessData.
@@ -854,11 +917,11 @@ namespace Par2NET
 
             List<Task> tasks = new List<Task>();
 
-            while (lCurrentStartBlockNo < missingblockcount)
+            while (lCurrentStartBlockNo < recoveryblockcount)
             {
                 uint lNextStartBlockNo = (uint)(lCurrentStartBlockNo + lNumBlocksPerThread);
-                if (lNextStartBlockNo > missingblockcount)
-                    lNextStartBlockNo = missingblockcount;		// Constraint
+                if (lNextStartBlockNo > recoveryblockcount)
+                    lNextStartBlockNo = (uint)recoveryblockcount;		// Constraint
 
                 if (multithreadCPU)
                 {
