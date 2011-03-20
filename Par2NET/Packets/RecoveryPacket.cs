@@ -79,7 +79,8 @@ namespace Par2NET.Packets
             tmpPacket.exponent = exponent;
 
             //tmpPacket.length = 0; //
-            tmpPacket.length = (int)(tmpPacket.header.GetSize() + sizeof(UInt32) + (int)blocksize);
+            tmpPacket.header.length = (ulong)(tmpPacket.header.GetSize() + sizeof(UInt32) + (int)blocksize);
+            tmpPacket.length = (int)tmpPacket.header.length;
 
             // Start computation of the packet hash
             tmpPacket.packetcontext = MD5.Create();
@@ -96,7 +97,7 @@ namespace Par2NET.Packets
 
                     byte[] buffer = ms.ToArray();
 
-                    tmpPacket.packetcontext.ComputeHash(buffer);
+                    tmpPacket.packetcontext.TransformBlock(buffer, 0, buffer.Length, null, 0);
                 }
             }
 
@@ -140,7 +141,8 @@ namespace Par2NET.Packets
         internal bool WriteData(ulong position, ulong size, byte[] buffer, ulong start)
         {
             // Update the packet hash
-            packetcontext.ComputeHash(buffer, (int)start, (int)size);
+            packetcontext.TransformFinalBlock(buffer, (int)start, (int)size); 
+            //packetcontext.ComputeHash(buffer, (int)start, (int)size);
 
             // Write the data to the data block
             uint wrote;

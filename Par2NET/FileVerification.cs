@@ -142,16 +142,12 @@ namespace Par2NET
 
                 //// Allocate an MD5 context for computing the file hash
                 //// during the recovery data generation phase
+                contextfull = MD5.Create();
                 //contextfull = new MD5Context;
             }
             else
             {
-                using (FileStream fs = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read))
-                {
-                    MD5 md5Hasher = MD5.Create();
-                    FileDescriptionPacket.hashfull = md5Hasher.ComputeHash(fs);
-                }
-
+                // Compute 16k MD5 hash
                 using (BinaryReader br = new BinaryReader(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read)))
                 {
                     MD5 md5Hasher = MD5.Create();
@@ -159,10 +155,76 @@ namespace Par2NET
                     FileDescriptionPacket.hash16k = md5Hasher.ComputeHash(buffer16k);
                 }
 
-
                 // Compute the fileid and store it in the verification packet.
                 FileDescriptionPacket.ComputeFileId();
                 FileVerificationPacket.fileid = (byte[])FileDescriptionPacket.fileid.Clone();
+
+                // Compute full file MD5 hash & block CRC32 and MD5 hashes
+
+                using (FileStream fs = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read))
+                {
+                    MD5 md5Hasher = MD5.Create();
+                    FileDescriptionPacket.hashfull = md5Hasher.ComputeHash(fs);
+                }
+
+                //TODO : Need implementation for calling SetBlockHashAndCRC for each block
+                long readSize = 5 * (long)blocksize;
+                long fileSize = new FileInfo(filename).Length;
+                long nbSteps =  fileSize / readSize;
+                long remaining = fileSize % readSize;
+                uint blocknumber = 0;
+
+                using (BinaryReader br = new BinaryReader(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read)))
+                {
+                    MD5 md5FullHasher = MD5.Create();
+                    MD5 md5Hasher = MD5.Create();
+                    FastCRC32.FastCRC32 crc32 = new FastCRC32.FastCRC32(blocksize);
+
+                    byte[] blockHash = new byte[16];
+                    uint blockCRC32 = 0;
+                    for (int i = 0; i < nbSteps + 1; ++i)
+                    {
+                        byte[] buffer = br.ReadBytes((int)(i == nbSteps ? remaining : readSize));
+
+                        // Global MD5 hash
+                        if (i == nbSteps)
+                            md5FullHasher.TransformFinalBlock(buffer, 0, buffer.Length);
+                        else
+                            md5FullHasher.TransformBlock(buffer, 0, buffer.Length, null, 0);
+
+                        for (uint j = 0; j < 5; ++j)
+                        {
+                            // Block MD5 hash & CRC32
+                            uint length = (uint)blocksize;
+
+                            if (i == nbSteps && j == 4)
+                            {
+                                if (remaining % (long)blocksize != 0)
+                                {
+                                    // We need arry padding since calculation **MUST** always be done on blocksize-length buffers
+                                    byte[] smallBuffer = buffer;
+                                    buffer = new byte[5*blocksize];
+                                    Buffer.BlockCopy(smallBuffer, 0, buffer, 0, smallBuffer.Length);
+                                }
+                            }
+                            
+                            blockCRC32 = crc32.CRCUpdateBlock(0xFFFFFFFF, (uint)blocksize, buffer, (uint)(j * blocksize)) ^ 0xFFFFFFFF;
+                            blockHash = md5Hasher.ComputeHash(buffer, (int)(j * blocksize), (int)blocksize);
+
+                            FileVerificationPacket.SetBlockHashAndCRC((uint)(i*j), blockHash, blockCRC32);
+                        }
+                    }
+
+                    FileDescriptionPacket.hashfull = md5FullHasher.Hash;
+                }
+
+
+                using (BinaryReader br = new BinaryReader(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read)))
+                {
+                    MD5 md5Hasher = MD5.Create();
+                    byte[] buffer16k = br.ReadBytes(16 * 1024);
+                    FileDescriptionPacket.hash16k = md5Hasher.ComputeHash(buffer16k);
+                }
             }
 
             return true;
@@ -184,7 +246,7 @@ namespace Par2NET
         internal void InitialiseSourceBlocks(ref List<DataBlock> sourceblocks, ulong blocksize)
         {
             crc32 = new FastCRC32.FastCRC32(blocksize);
-            contextfull = MD5.Create();
+            //contextfull = MD5.Create();
 
             for (uint blocknum = 0; blocknum < blockcount; blocknum++)
             {
@@ -201,8 +263,8 @@ namespace Par2NET
             Debug.Assert(contextfull != null);
 
             // Finish computation of the full file hash
-            // Store it in the description packet
-            this.FileDescriptionPacket.hashfull = contextfull.Hash;
+            // Store it in the description
+            this.FileDescriptionPacket.hashfull = contextfull.TransformFinalBlock(new byte[] {}, 0, 0);
         }
 
         internal void UpdateHashes(uint blocknumber, byte[] buffer, ulong length)
@@ -226,7 +288,8 @@ namespace Par2NET
 
                 Debug.Assert(contextfull != null);
 
-                contextfull.ComputeHash(buffer, 0, (int)length);
+                contextfull.TransformBlock(buffer, 0, buffer.Length, null, 0);
+                //contextfull.ComputeHash(buffer, 0, (int)length);
             }
         }
     }

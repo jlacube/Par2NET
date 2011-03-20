@@ -322,7 +322,7 @@ namespace Par2NET
             else
             {
                 // Would single pass processing use too much memory
-                if (MainPacket.blocksize * (ulong)recoveryblockcount > memorylimit)
+                if (MainPacket.blocksize * (ulong)recoveryblockcount > memorylimit && this.largestfilesize > MainPacket.blocksize)
                 {
                     unchecked
                     {
@@ -330,13 +330,13 @@ namespace Par2NET
                         chunksize = (ulong)~3 & (memorylimit / (ulong)recoveryblockcount);
                     }
 
-                    deferhashcomputation = false;
+                    deferhashcomputation = true;
                 }
                 else
                 {
                     chunksize = MainPacket.blocksize;
 
-                    deferhashcomputation = true;
+                    deferhashcomputation = false;
                 }
             }
 

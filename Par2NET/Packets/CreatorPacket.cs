@@ -70,7 +70,7 @@ namespace Par2NET.Packets
                 {
                     bw.Write(tmpPacket.header.setid);
                     bw.Write(tmpPacket.header.type);
-                    bw.Write(tmpPacket.client);
+                    bw.Write(Encoding.UTF8.GetBytes(tmpPacket.client));
                 }
 
                 byte[] buffer = ms.ToArray();
