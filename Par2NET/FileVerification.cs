@@ -160,14 +160,6 @@ namespace Par2NET
                 FileVerificationPacket.fileid = (byte[])FileDescriptionPacket.fileid.Clone();
 
                 // Compute full file MD5 hash & block CRC32 and MD5 hashes
-
-                using (FileStream fs = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read))
-                {
-                    MD5 md5Hasher = MD5.Create();
-                    FileDescriptionPacket.hashfull = md5Hasher.ComputeHash(fs);
-                }
-
-                //TODO : Need implementation for calling SetBlockHashAndCRC for each block
                 long readSize = 5 * (long)blocksize;
                 long fileSize = new FileInfo(filename).Length;
                 long nbSteps =  fileSize / readSize;
