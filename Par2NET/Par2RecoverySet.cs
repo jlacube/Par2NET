@@ -913,6 +913,7 @@ namespace Par2NET
             // First, establish the number of blocks to be processed by each thread. Of course the last
             // one started might get some less...
             int lNumBlocksPerThread = (recoveryblockcount - 1) / lNumThreads + 1;		// Round up
+            //int lNumBlocksPerThread = 1;
             uint lCurrentStartBlockNo = 0;
 
             List<Task> tasks = new List<Task>();
@@ -930,12 +931,12 @@ namespace Par2NET
                     tasks.Add(Task.Factory.StartNew((a) =>
                     {
                         object[] list = (object[])a;
-                        uint bl = (uint)list[0];
+                        ulong bl = (ulong)list[0];
                         uint ii = (uint)list[1];
                         uint csb = (uint)list[2];
                         uint nsb = (uint)list[3];
-                        CreateParityBlockRange(bl, ii, csb, nsb);
-                    }, args, TaskCreationOptions.LongRunning));
+                        CreateParityBlockRange((uint)bl, ii, csb, nsb);
+                    }, args/*, TaskCreationOptions.LongRunning*/));
                 }
                 else
                 {

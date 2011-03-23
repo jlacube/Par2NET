@@ -14,6 +14,7 @@ namespace FastGaloisFields
         public ushort Value
         {
             get { return value; }
+            set { this.value = value; }
         }
 
         public uint Bits

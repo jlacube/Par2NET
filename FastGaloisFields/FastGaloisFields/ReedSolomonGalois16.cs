@@ -125,8 +125,9 @@ namespace FastGaloisFields
 
             try
             {
-                FastGaloisFieldsUnsafeProcessor unsafeProcessor = new FastGaloisFieldsUnsafeProcessor();
-                return unsafeProcessor.InternalProcess(factor, size, inputbuffer, outputbuffer, startIndex, length);
+                //FastGaloisFieldsUnsafeProcessor unsafeProcessor = new FastGaloisFieldsUnsafeProcessor();
+                //return unsafeProcessor.InternalProcess(factor, size, inputbuffer, outputbuffer, startIndex, length);
+                return FastGaloisFieldsUnsafeProcessor.InternalProcess(factor, size, inputbuffer, outputbuffer, startIndex, length);
             }
             catch (SecurityException)
             {
