@@ -13,11 +13,11 @@ namespace FastGaloisFieldsUnsafe
         static uint bits = 16;
         static uint generator = 0x1100B;
 
-        static uint count = 0;
-        static uint limit = 0;
+        public static uint count = 0;
+        public static uint limit = 0;
 
-        static ushort[] log = null;
-        static ushort[] antilog = null;
+        public static ushort[] log = null;
+        public static ushort[] antilog = null;
 
         static FastGaloisFieldsUnsafeProcessor()
         {
@@ -44,7 +44,7 @@ namespace FastGaloisFieldsUnsafe
             antilog[limit] = 0;
         }
 
-        static ushort Multiply(ushort a, ushort b)
+        public static ushort Multiply(ushort a, ushort b)
         {
             if (a == 0 || b == 0)
                 return 0;
@@ -61,12 +61,56 @@ namespace FastGaloisFieldsUnsafe
             }
         }
 
-        static ushort Add(ushort a, ushort b)
+        public static ushort Divide(ushort a, ushort b)
+        {
+            if (a == 0) return 0;
+
+            if (b == 0)
+                return 0; // Division by 0!
+
+            int sum = log[a] - log[b];
+            if (sum < 0)
+            {
+                return antilog[sum + limit];
+            }
+            else
+            {
+                return antilog[sum];
+            }
+        }
+
+        public static ushort Pow(ushort a, ushort b)
+        {
+            if (b == 0)
+                return 1;
+
+            if (a == 0)
+                return 0;
+
+            int sum = log[a] * b;
+
+            sum = (int)((sum >> (int)bits) + (sum & limit));
+            if (sum >= limit)
+            {
+                return antilog[sum - limit];
+            }
+            else
+            {
+                return antilog[sum];
+            }
+        }
+
+        public static ushort Add(ushort a, ushort b)
         {
             return (ushort)(a ^ b);
         }
 
-        public static bool InternalProcess(Galois16 factor, uint size, byte[] inputbuffer, byte[] outputbuffer, int startIndex, uint length)
+        public static ushort Minus(ushort a, ushort b)
+        {
+            return (ushort)(a ^ b);
+        }
+
+        public static bool InternalProcess(ushort factor, uint size, byte[] inputbuffer, byte[] outputbuffer, int startIndex, uint length)
         {
             try
             {
@@ -74,13 +118,12 @@ namespace FastGaloisFieldsUnsafe
                 {
                     fixed (byte* pInputBuffer = inputbuffer, pOutputBuffer = outputbuffer)
                     {
-                        ushort uFactor = factor.Value;
                         UInt16* pInput = (UInt16*)pInputBuffer;
                         UInt16* pOutput = (UInt16*)(pOutputBuffer + startIndex);
 
                         for (int i = 0; i < inputbuffer.Length / 2; ++i)
                         {
-                            *pOutput = Add(*pOutput, Multiply(*pInput, uFactor));
+                            *pOutput = Add(*pOutput, Multiply(*pInput, factor));
 
                             ++pInput;
                             ++pOutput;
@@ -101,51 +144,6 @@ namespace FastGaloisFieldsUnsafe
 #endif
                 return false;
             }
-        }
-
-        public bool InternalProcess_orig(Galois16 factor, uint size, byte[] inputbuffer, byte[] outputbuffer)
-        {
-            try
-            {
-                GCHandle inputGCH = GCHandle.Alloc(inputbuffer);
-                IntPtr inputPtr = GCHandle.ToIntPtr(inputGCH);
-
-                unsafe
-                {
-                    fixed (byte* pInputBuffer = inputbuffer, pOutputBuffer = outputbuffer)
-                    {
-                        UInt16* pInput = (UInt16*)pInputBuffer;
-                        UInt16* pOutput = (UInt16*)pOutputBuffer;
-
-                        for (int i = 0; i < inputbuffer.Length / 2; ++i)
-                        {
-                            Galois16 gInput = *pInput;
-                            Galois16 gOutput = *pOutput;
-
-                            gOutput += gInput * factor.Value;
-
-                            *pOutput = gOutput.Value;
-
-                            ++pInput;
-                            ++pOutput;
-                        }
-                    }
-                }
-
-                return true;
-            }
-#if Debug
-            catch (Exception ex)
-            {
-
-                Debug.WriteLine(ex);
-#else
-            catch (Exception)
-            {
-#endif
-                return false;
-            }
-
         }
     }
 }

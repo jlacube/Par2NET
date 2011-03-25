@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using FastGaloisFieldsUnsafe;
 
 namespace FastGaloisFields
 {
@@ -32,7 +33,7 @@ namespace FastGaloisFields
         }
 
         // Use Gaussian Elimination to solve the matrices
-        protected static bool GaussElim(uint rows, uint leftcols, Galois16[] leftmatrix, Galois16[] rightmatrix, uint datamissing)
+        protected static bool GaussElim(uint rows, uint leftcols, ushort[] leftmatrix, ushort[] rightmatrix, uint datamissing)
         {
             //if (noiselevel == CommandLine::nlDebug)
             //{
@@ -77,30 +78,30 @@ namespace FastGaloisFields
                 // is not necessary due to the nature of the arithmetic and construction of the RS matrix.
 
                 // Get the pivot value.
-                Galois16 pivotvalue = rightmatrix[row * rows + row];
+                ushort pivotvalue = rightmatrix[row * rows + row];
 
-                if (pivotvalue.Value == 0)
+                if (pivotvalue == 0)
                 {
                     //cerr << "RS computation error." << endl;
                     return false;
                 }
 
                 // If the pivot value is not 1, then the whole row has to be scaled
-                if (pivotvalue.Value != 1)
+                if (pivotvalue != 1)
                 {
                     for (uint col = 0; col < leftcols; col++)
                     {
-                        if (leftmatrix[row * leftcols + col].Value != 0)
+                        if (leftmatrix[row * leftcols + col] != 0)
                         {
-                            leftmatrix[row * leftcols + col] /= pivotvalue;
+                            leftmatrix[row * leftcols + col] = FastGaloisFieldsUnsafeProcessor.Divide(leftmatrix[row * leftcols + col],pivotvalue);
                         }
                     }
                     rightmatrix[row * rows + row] = 1;
                     for (uint col = row + 1; col < rows; col++)
                     {
-                        if (rightmatrix[row * rows + col].Value != 0)
+                        if (rightmatrix[row * rows + col] != 0)
                         {
-                            rightmatrix[row * rows + col] /= pivotvalue;
+                            rightmatrix[row * rows + col] = FastGaloisFieldsUnsafeProcessor.Divide(rightmatrix[row * rows + col], pivotvalue);
                         }
                     }
                 }
@@ -124,43 +125,43 @@ namespace FastGaloisFields
                     if (row != row2)
                     {
                         // Get the scaling factor for this row.
-                        Galois16 scalevalue = rightmatrix[row2 * rows + row];
+                        ushort scalevalue = rightmatrix[row2 * rows + row];
 
-                        if (scalevalue.Value == 1)
+                        if (scalevalue == 1)
                         {
                             // If the scaling factor happens to be 1, just subtract rows
                             for (uint col = 0; col < leftcols; col++)
                             {
-                                if (leftmatrix[row * leftcols + col].Value != 0)
+                                if (leftmatrix[row * leftcols + col] != 0)
                                 {
-                                    leftmatrix[row2 * leftcols + col] -= leftmatrix[row * leftcols + col];
+                                    leftmatrix[row2 * leftcols + col] = FastGaloisFieldsUnsafeProcessor.Minus(leftmatrix[row2 * leftcols + col], leftmatrix[row * leftcols + col]);
                                 }
                             }
 
                             for (uint col = row; col < rows; col++)
                             {
-                                if (rightmatrix[row * rows + col].Value != 0)
+                                if (rightmatrix[row * rows + col] != 0)
                                 {
-                                    rightmatrix[row2 * rows + col] -= rightmatrix[row * rows + col];
+                                    rightmatrix[row2 * rows + col] = FastGaloisFieldsUnsafeProcessor.Minus(rightmatrix[row2 * rows + col], rightmatrix[row * rows + col]);
                                 }
                             }
                         }
-                        else if (scalevalue.Value != 0)
+                        else if (scalevalue != 0)
                         {
                             // If the scaling factor is not 0, then compute accordingly.
                             for (uint col = 0; col < leftcols; col++)
                             {
-                                if (leftmatrix[row * leftcols + col].Value != 0)
+                                if (leftmatrix[row * leftcols + col] != 0)
                                 {
-                                    leftmatrix[row2 * leftcols + col] -= leftmatrix[row * leftcols + col] * scalevalue;
+                                    leftmatrix[row2 * leftcols + col] = FastGaloisFieldsUnsafeProcessor.Multiply(FastGaloisFieldsUnsafeProcessor.Minus(leftmatrix[row2 * leftcols + col], leftmatrix[row * leftcols + col]), scalevalue);
                                 }
                             }
 
                             for (uint col = row; col < rows; col++)
                             {
-                                if (rightmatrix[row * rows + col].Value != 0)
+                                if (rightmatrix[row * rows + col] != 0)
                                 {
-                                    rightmatrix[row2 * rows + col] -= rightmatrix[row * rows + col] * scalevalue;
+                                    rightmatrix[row2 * rows + col] = FastGaloisFieldsUnsafeProcessor.Multiply(FastGaloisFieldsUnsafeProcessor.Minus(rightmatrix[row2 * rows + col], rightmatrix[row * rows + col]), scalevalue);
                                 }
                             }
                         }

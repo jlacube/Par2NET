@@ -971,26 +971,26 @@ namespace Par2NET
             }
         }
 
-        private void CreateParityBlockRange_orig(uint blocklength, uint inputindex, uint aStartBlockNo, uint aEndBlockNo)
-        {
-            // This function runs in multiple threads.
-            // For each output block
-            for (uint outputindex = aStartBlockNo; outputindex < aEndBlockNo; outputindex++)
-            {
-                // Select the appropriate part of the output buffer
-                byte[] outbuf = new byte[blocklength];
+//        private void CreateParityBlockRange_orig(uint blocklength, uint inputindex, uint aStartBlockNo, uint aEndBlockNo)
+//        {
+//            // This function runs in multiple threads.
+//            // For each output block
+//            for (uint outputindex = aStartBlockNo; outputindex < aEndBlockNo; outputindex++)
+//            {
+//                // Select the appropriate part of the output buffer
+//                byte[] outbuf = new byte[blocklength];
 
-                Buffer.BlockCopy(outputbuffer, (int)(chunksize * outputindex), outbuf, 0, outbuf.Length);
+//                Buffer.BlockCopy(outputbuffer, (int)(chunksize * outputindex), outbuf, 0, outbuf.Length);
 
-                // Process the data
-                rs.Process_orig(blocklength, inputindex, inputbuffer, outputindex, outbuf);
+//                // Process the data
+//                rs.Process_orig(blocklength, inputindex, inputbuffer, outputindex, outbuf);
 
-#if TRACE
-                ToolKit.LogArrayToFile<byte>("outbuf." + inputindex + ".log", outbuf);
-#endif
-                Buffer.BlockCopy(outbuf, 0, outputbuffer, (int)(chunksize * outputindex), outbuf.Length);
-            }
-        }
+//#if TRACE
+//                ToolKit.LogArrayToFile<byte>("outbuf." + inputindex + ".log", outbuf);
+//#endif
+//                Buffer.BlockCopy(outbuf, 0, outputbuffer, (int)(chunksize * outputindex), outbuf.Length);
+//            }
+//        }
 
         // Finish computation of the recovery packets and write the headers to disk.
         internal bool WriteRecoveryPacketHeaders()
@@ -1963,26 +1963,26 @@ namespace Par2NET
             }
         }
 
-        private void RepairMissingBlockRange_orig(uint blocklength, uint inputindex, uint aStartBlockNo, uint aEndBlockNo)
-        {
-            // This function runs in multiple threads.
-            // For each output block
-            for (uint outputindex = aStartBlockNo; outputindex < aEndBlockNo; outputindex++)
-            {
-                // Select the appropriate part of the output buffer
-                byte[] outbuf = new byte[blocklength];
+//        private void RepairMissingBlockRange_orig(uint blocklength, uint inputindex, uint aStartBlockNo, uint aEndBlockNo)
+//        {
+//            // This function runs in multiple threads.
+//            // For each output block
+//            for (uint outputindex = aStartBlockNo; outputindex < aEndBlockNo; outputindex++)
+//            {
+//                // Select the appropriate part of the output buffer
+//                byte[] outbuf = new byte[blocklength];
 
-                Buffer.BlockCopy(outputbuffer, (int)(chunksize * outputindex), outbuf, 0, outbuf.Length);
+//                Buffer.BlockCopy(outputbuffer, (int)(chunksize * outputindex), outbuf, 0, outbuf.Length);
 
-                // Process the data
-                rs.Process_orig(blocklength, inputindex, inputbuffer, outputindex, outbuf);
+//                // Process the data
+//                rs.Process_orig(blocklength, inputindex, inputbuffer, outputindex, outbuf);
 
-#if TRACE
-                ToolKit.LogArrayToFile<byte>("outbuf." + inputindex + ".log", outbuf);
-#endif
-                Buffer.BlockCopy(outbuf, 0, outputbuffer, (int)(chunksize * outputindex), outbuf.Length);
-            }
-        }
+//#if TRACE
+//                ToolKit.LogArrayToFile<byte>("outbuf." + inputindex + ".log", outbuf);
+//#endif
+//                Buffer.BlockCopy(outbuf, 0, outputbuffer, (int)(chunksize * outputindex), outbuf.Length);
+//            }
+//        }
 
         // Check the verification results and report the results 
         internal bool CheckVerificationResults(bool aSilent)

@@ -30,7 +30,8 @@ namespace FastGaloisFields
 
         List<RSOutputRow> outputrows = new List<RSOutputRow>();   // Details of the output blocks
 
-        Galois16[] leftmatrix = null;       // The main matrix
+        //Galois16[] leftmatrix = null;       // The main matrix
+        ushort[] leftmatrix = null;       // The main matrix
 
         GaloisLongMultiplyTable16 glmt;
 
@@ -49,73 +50,60 @@ namespace FastGaloisFields
             // This resulted in a speed gain of approx. 8% in repairing.
 
             // Look up the appropriate element in the RS matrix
-            Galois16 factor = leftmatrix[outputindex * (datapresent + datamissing) + inputindex];
+            //Galois16 factor = leftmatrix[outputindex * (datapresent + datamissing) + inputindex];
+            ushort factor = leftmatrix[outputindex * (datapresent + datamissing) + inputindex];
 
             // Do nothing if the factor happens to be 0
-            if (factor.Value == 0)
+            //if (factor.Value == 0)
+            if (factor == 0)
                 return true;
 
             return InternalProcess(factor, size, inputbuffer, outputbuffer, startIndex, length);
         }
 
-        public bool Process_orig(uint size, uint inputindex, byte[] inputbuffer, uint outputindex, byte[] outputbuffer)
-        {
-            // Optimization: it occurs frequently the function exits early on, so inline the start.
-            // This resulted in a speed gain of approx. 8% in repairing.
+        //private bool InternalProcessSafe(Galois16 factor, uint size, byte[] inputbuffer, byte[] outputbuffer)
+        //{
+        //    //Treat the buffers as arrays of 16-bit Galois values.
+        //    //Awfully long to execute
 
-            // Look up the appropriate element in the RS matrix
-            Galois16 factor = leftmatrix[outputindex * (datapresent + datamissing) + inputindex];
+        //    try
+        //    {
+        //        // Create Galois16 inputbuffer
+        //        Galois16[] inputGalois16 = new Galois16[inputbuffer.Length / 2];
 
-            // Do nothing if the factor happens to be 0
-            if (factor.Value == 0)
-                return true;
+        //        // Create Galois16 outputbuffer
+        //        Galois16[] outputGalois16 = new Galois16[inputGalois16.Length];
 
-            return InternalProcess_orig(factor, size, inputbuffer, outputbuffer);
-        }
+        //        // Fill Galois16 input buffer with inpuntbuffer values
+        //        for (int i = 0; i < inputGalois16.Length; ++i)
+        //        {
+        //            inputGalois16[i] = (Galois16)(inputbuffer[2 * i + 1] << 8 | inputbuffer[2 * i]);
+        //            outputGalois16[i] = (Galois16)(outputbuffer[2 * i + 1] << 8 | outputbuffer[2 * i]);
+        //        }
 
-        private bool InternalProcessSafe(Galois16 factor, uint size, byte[] inputbuffer, byte[] outputbuffer)
-        {
-            //Treat the buffers as arrays of 16-bit Galois values.
-            //Awfully long to execute
+        //        // Process the data
+        //        for (uint i = 0; i < outputGalois16.Length; ++i)
+        //        {
+        //            outputGalois16[i] += inputGalois16[i] * factor.Value;
+        //        }
 
-            try
-            {
-                // Create Galois16 inputbuffer
-                Galois16[] inputGalois16 = new Galois16[inputbuffer.Length / 2];
+        //        // Copy back data from Galois16 output buffer to outputbuffer (byte)
+        //        for (int i = 0; i < outputGalois16.Length; ++i)
+        //        {
+        //            outputbuffer[2 * i + 1] = (byte)(outputGalois16[i].Value >> 8 & 0xFF);
+        //            outputbuffer[2 * i] = (byte)(outputGalois16[i].Value & 0xFF);
+        //        }
 
-                // Create Galois16 outputbuffer
-                Galois16[] outputGalois16 = new Galois16[inputGalois16.Length];
+        //        return true;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Debug.WriteLine(ex);
+        //        return false;
+        //    }
+        //}
 
-                // Fill Galois16 input buffer with inpuntbuffer values
-                for (int i = 0; i < inputGalois16.Length; ++i)
-                {
-                    inputGalois16[i] = (Galois16)(inputbuffer[2 * i + 1] << 8 | inputbuffer[2 * i]);
-                    outputGalois16[i] = (Galois16)(outputbuffer[2 * i + 1] << 8 | outputbuffer[2 * i]);
-                }
-
-                // Process the data
-                for (uint i = 0; i < outputGalois16.Length; ++i)
-                {
-                    outputGalois16[i] += inputGalois16[i] * factor.Value;
-                }
-
-                // Copy back data from Galois16 output buffer to outputbuffer (byte)
-                for (int i = 0; i < outputGalois16.Length; ++i)
-                {
-                    outputbuffer[2 * i + 1] = (byte)(outputGalois16[i].Value >> 8 & 0xFF);
-                    outputbuffer[2 * i] = (byte)(outputGalois16[i].Value & 0xFF);
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine(ex);
-                return false;
-            }
-        }
-
-        private bool InternalProcess(Galois16 factor, uint size, byte[] inputbuffer, byte[] outputbuffer, int startIndex, uint length)
+        private bool InternalProcess(ushort factor, uint size, byte[] inputbuffer, byte[] outputbuffer, int startIndex, uint length)
         {
             // Rewrite : TPL ?
             // Rewrite : Dynamic load FastGaloisFieldsUnsafe
@@ -131,31 +119,8 @@ namespace FastGaloisFields
             }
             catch (SecurityException)
             {
-                return InternalProcessSafe(factor, size, inputbuffer, outputbuffer);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine(ex);
+                //return InternalProcessSafe(factor, size, inputbuffer, outputbuffer);
                 return false;
-            }
-        }
-
-        private bool InternalProcess_orig(Galois16 factor, uint size, byte[] inputbuffer, byte[] outputbuffer)
-        {
-            // Rewrite : TPL ?
-            // Rewrite : Dynamic load FastGaloisFieldsUnsafe
-
-            //FastGaloisFieldsSafeProcessor safeProcessor = new FastGaloisFieldsSafeProcessor();
-            //return safeProcessor.InternalProcess(factor, size, inputbuffer, outputbuffer);
-
-            try
-            {
-                FastGaloisFieldsUnsafeProcessor unsafeProcessor = new FastGaloisFieldsUnsafeProcessor();
-                return unsafeProcessor.InternalProcess_orig(factor, size, inputbuffer, outputbuffer);
-            }
-            catch (SecurityException)
-            {
-                return InternalProcessSafe(factor, size, inputbuffer, outputbuffer);
             }
             catch (Exception ex)
             {
@@ -222,7 +187,7 @@ namespace FastGaloisFields
 
             uint logbase = 0;
 
-            Galois16 G = new Galois16();
+            //Galois16 G = new Galois16();
 
             for (uint index = 0; index < inputcount; index++)
             {
@@ -239,18 +204,21 @@ namespace FastGaloisFields
 
                 // Determine the next useable base value.
                 // Its log must must be relatively prime to 65535
-                while (gcd(G.Limit, logbase) != 1)
+                //while (gcd(G.Limit, logbase) != 1)
+                while (gcd(FastGaloisFieldsUnsafeProcessor.limit, logbase) != 1)
                 {
                     logbase++;
                 }
-                if (logbase >= G.Limit)
+                //if (logbase >= G.Limit)
+                if (logbase >= FastGaloisFieldsUnsafeProcessor.limit)
                 {
                     //cerr << "Too many input blocks for Reed Solomon matrix." << endl;
                     return false;
                 }
 
 
-                ushort ibase = new Galois16((ushort)logbase++).ALog();
+                //ushort ibase = new Galois16((ushort)logbase++).ALog();
+                ushort ibase = FastGaloisFieldsUnsafeProcessor.antilog[(ushort)logbase++];
 
                 database[index] = ibase;
             }
@@ -274,7 +242,7 @@ namespace FastGaloisFields
 
             uint logbase = 0;
 
-            Galois16 G = new Galois16();
+            //Galois16 G = new Galois16();
 
             for (uint index = 0; index < count; index++)
             {
@@ -283,17 +251,20 @@ namespace FastGaloisFields
 
                 // Determine the next useable base value.
                 // Its log must must be relatively prime to 65535
-                while (gcd(G.Limit, logbase) != 1)
+                //while (gcd(G.Limit, logbase) != 1)
+                while (gcd(FastGaloisFieldsUnsafeProcessor.limit, logbase) != 1)
                 {
                     logbase++;
                 }
-                if (logbase >= G.Limit)
+                //if (logbase >= G.Limit)
+                if (logbase >= FastGaloisFieldsUnsafeProcessor.limit)
                 {
                     //cerr << "Too many input blocks for Reed Solomon matrix." << endl;
                     return false;
                 }
 
-                ushort ibase = new Galois16((ushort)logbase++).ALog();
+                //ushort ibase = new Galois16((ushort)logbase++).ALog();
+                ushort ibase = FastGaloisFieldsUnsafeProcessor.antilog[(ushort)logbase++];
 
                 database[index] = ibase;
             }
@@ -342,22 +313,27 @@ namespace FastGaloisFields
 
             // Allocate the left hand matrix
 
-            leftmatrix = new Galois16[outcount * incount];
+            //leftmatrix = new Galois16[outcount * incount];
+            leftmatrix = new ushort[outcount * incount];
             for (int i = 0; i < outcount * incount; ++i)
             {
-                leftmatrix[i] = new Galois16(0);
+                //leftmatrix[i] = new Galois16(0);
+                leftmatrix[i] = 0;
             }
 
             // Allocate the right hand matrix only if we are recovering
 
-            Galois16[] rightmatrix = null;
+            //Galois16[] rightmatrix = null;
+            ushort[] rightmatrix = null;
             if (datamissing > 0)
             {
-                rightmatrix = new Galois16[outcount * outcount];
+                //rightmatrix = new Galois16[outcount * outcount];
+                rightmatrix = new ushort[outcount * outcount];
 
                 for (int i = 0; i < outcount * outcount; ++i)
                 {
-                    rightmatrix[i] = new Galois16(0);
+                    //rightmatrix[i] = new Galois16(0);
+                    rightmatrix[i] = 0;
                 }
             }
 
@@ -388,13 +364,15 @@ namespace FastGaloisFields
                 // One column for each present data block
                 for (uint col = 0; col < datapresent; col++)
                 {
-                    leftmatrix[row * incount + col] = Galois16.Pow(new Galois16(database[datapresentindex[col]]), new Galois16(exponent));
+                    //leftmatrix[row * incount + col] = Galois16.Pow(new Galois16(database[datapresentindex[col]]), new Galois16(exponent));
+                    leftmatrix[row * incount + col] = FastGaloisFieldsUnsafeProcessor.Pow(database[datapresentindex[col]], exponent);
                 }
 
                 // One column for each each present recovery block that will be used for a missing data block
                 for (uint col = 0; col < datamissing; col++)
                 {
-                    leftmatrix[row * incount + col + datapresent] = (row == col) ? 1 : 0;
+                    //leftmatrix[row * incount + col + datapresent] = (row == col) ? 1 : 0;
+                    leftmatrix[row * incount + col + datapresent] = (ushort)(row == col ? 1 : 0 );
                 }
 
                 if (datamissing > 0)
@@ -402,7 +380,8 @@ namespace FastGaloisFields
                     // One column for each missing data block
                     for (uint col = 0; col < datamissing; col++)
                     {
-                        rightmatrix[row * outcount + col] = Galois16.Pow(new Galois16(database[datamissingindex[col]]), new Galois16(exponent));
+                        //rightmatrix[row * outcount + col] = Galois16.Pow(new Galois16(database[datamissingindex[col]]), new Galois16(exponent));
+                        rightmatrix[row * outcount + col] = FastGaloisFieldsUnsafeProcessor.Pow(database[datamissingindex[col]], exponent);
                     }
                     // One column for each missing recovery block
                     for (uint col = 0; col < parmissing; col++)
@@ -436,7 +415,8 @@ namespace FastGaloisFields
                 // One column for each present data block
                 for (uint col = 0; col < datapresent; col++)
                 {
-                    leftmatrix[(row + datamissing) * incount + col] = Galois16.Pow(new Galois16(database[datapresentindex[col]]), new Galois16(exponent));
+                    //leftmatrix[(row + datamissing) * incount + col] = Galois16.Pow(new Galois16(database[datapresentindex[col]]), new Galois16(exponent));
+                    leftmatrix[(row + datamissing) * incount + col] = FastGaloisFieldsUnsafeProcessor.Pow(database[datapresentindex[col]], exponent);
                 }
                 // One column for each each present recovery block that will be used for a missing data block
                 for (uint col = 0; col < datamissing; col++)
@@ -449,22 +429,24 @@ namespace FastGaloisFields
                     // One column for each missing data block
                     for (uint col = 0; col < datamissing; col++)
                     {
-                        rightmatrix[(row + datamissing) * outcount + col] = Galois16.Pow(new Galois16(database[datamissingindex[col]]), new Galois16(exponent));
+                        //rightmatrix[(row + datamissing) * outcount + col] = Galois16.Pow(new Galois16(database[datamissingindex[col]]), new Galois16(exponent));
+                        rightmatrix[(row + datamissing) * outcount + col] = FastGaloisFieldsUnsafeProcessor.Pow(database[datamissingindex[col]], exponent);
                     }
                     // One column for each missing recovery block
                     for (uint col = 0; col < parmissing; col++)
                     {
-                        rightmatrix[(row + datamissing) * outcount + col + datamissing] = (row == col) ? 1 : 0;
+                        //rightmatrix[(row + datamissing) * outcount + col + datamissing] = (row == col) ? 1 : 0;
+                        rightmatrix[(row + datamissing) * outcount + col + datamissing] = (ushort)(row == col ? 1 : 0);
                     }
                 }
 
                 //row++;
             }
 
-#if TRACE
-            LogArrayToFile<Galois16>(@"leftmatrix.before.gauss.log", leftmatrix);
-            LogArrayToFile<Galois16>(@"rightmatrix.before.gauss.log", rightmatrix);
-#endif
+//#if TRACE
+//            LogArrayToFile<Galois16>(@"leftmatrix.before.gauss.log", leftmatrix);
+//            LogArrayToFile<Galois16>(@"rightmatrix.before.gauss.log", rightmatrix);
+//#endif
            
             //if (noiselevel > CommandLine::nlQuiet)
             //  cout << "Constructing: done." << endl;
@@ -479,10 +461,10 @@ namespace FastGaloisFields
                 //return success;
             }
 
-#if TRACE
-            LogArrayToFile<Galois16>(@"leftmatrix.after.gauss.log", leftmatrix);
-            LogArrayToFile<Galois16>(@"rightmatrix.after.gauss.log", rightmatrix);
-#endif
+//#if TRACE
+//            LogArrayToFile<Galois16>(@"leftmatrix.after.gauss.log", leftmatrix);
+//            LogArrayToFile<Galois16>(@"rightmatrix.after.gauss.log", rightmatrix);
+//#endif
 
             return true;
         }

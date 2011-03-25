@@ -25,6 +25,8 @@ namespace Par2NET.Console
          * /mtio- /mtcpu- /a:ParVerify /rf:\\VBOXSVR\SharedFolders\Tests\5150.Rue.Des.Ormes.LIMITED.FRENCHDVDRIP.XVID.AC3-TBoss\5150.par2
          * 
          * 
+         * /if:"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\CreateTests\EntLib50.chm" /if:"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\CreateTests\EntLib50_copy.chm" /if:"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\CreateTests\EntLib50_copy2.chm" /rbc:30 /mtio- /mtcpu+ /action:ParCreate
+         * 
          */
         static void Main(string[] args)
         {
