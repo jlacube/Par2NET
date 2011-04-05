@@ -45,8 +45,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BinaryStreamReader.cs" />
+    <Compile Include="CheckBufferState.cs" />
     <Compile Include="CriticalPacketEntry.cs" />
     <Compile Include="FileChecker.cs" />
+    <Compile Include="FileCheckerState.cs" />
     <Compile Include="Packets\CriticalPacket.cs" />
     <Compile Include="Par2FileAllocation.cs" />
     <Compile Include="SingletonProvider.cs" />

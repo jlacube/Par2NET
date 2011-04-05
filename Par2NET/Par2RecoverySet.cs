@@ -1312,7 +1312,8 @@ namespace Par2NET
         {
             MatchType matchType = MatchType.NoMatch;
 
-            FileChecker.CheckFile(fileVer.GetTargetFile(), fileVer.TargetFileName, (int)this.MainPacket.blocksize, fileVer.FileVerificationPacket.entries, fileVer.FileDescriptionPacket.hash16k, fileVer.FileDescriptionPacket.hashfull, ref matchType, verificationhashtablefull, verificationhashtable, expectedblocklist, ref expectedblockindex, this.multithreadCPU);
+            //FileChecker.CheckFile(fileVer.GetTargetFile(), fileVer.TargetFileName, (int)this.MainPacket.blocksize, fileVer.FileVerificationPacket.entries, fileVer.FileDescriptionPacket.hash16k, fileVer.FileDescriptionPacket.hashfull, ref matchType, verificationhashtablefull, verificationhashtable, expectedblocklist, ref expectedblockindex, this.multithreadCPU);
+            FileChecker.CheckFile_async(fileVer.GetTargetFile(), fileVer.TargetFileName, (int)this.MainPacket.blocksize, fileVer.FileVerificationPacket.entries, fileVer.FileDescriptionPacket.hash16k, fileVer.FileDescriptionPacket.hashfull, ref matchType, verificationhashtablefull, verificationhashtable, expectedblocklist, ref expectedblockindex, this.multithreadCPU);
 
             if (matchType == MatchType.FullMatch)
             {
