@@ -8,6 +8,13 @@ namespace FastGaloisFields
 {
     public class ReedSolomon
     {
+        private static IFastGaloisFieldsProcessor processor = null;
+
+        static ReedSolomon()
+        {
+            processor = FastGaloisFieldsFactory.GetProcessor();
+        }
+
         protected static uint gcd(uint a, uint b)
         {
             if (a != 0 && b != 0)
@@ -93,7 +100,7 @@ namespace FastGaloisFields
                     {
                         if (leftmatrix[row * leftcols + col] != 0)
                         {
-                            leftmatrix[row * leftcols + col] = FastGaloisFieldsUnsafeProcessor.Divide(leftmatrix[row * leftcols + col],pivotvalue);
+                            leftmatrix[row * leftcols + col] = processor.Divide(leftmatrix[row * leftcols + col], pivotvalue);
                         }
                     }
                     rightmatrix[row * rows + row] = 1;
@@ -101,7 +108,7 @@ namespace FastGaloisFields
                     {
                         if (rightmatrix[row * rows + col] != 0)
                         {
-                            rightmatrix[row * rows + col] = FastGaloisFieldsUnsafeProcessor.Divide(rightmatrix[row * rows + col], pivotvalue);
+                            rightmatrix[row * rows + col] = processor.Divide(rightmatrix[row * rows + col], pivotvalue);
                         }
                     }
                 }
@@ -134,7 +141,7 @@ namespace FastGaloisFields
                             {
                                 if (leftmatrix[row * leftcols + col] != 0)
                                 {
-                                    leftmatrix[row2 * leftcols + col] = FastGaloisFieldsUnsafeProcessor.Minus(leftmatrix[row2 * leftcols + col], leftmatrix[row * leftcols + col]);
+                                    leftmatrix[row2 * leftcols + col] = processor.Minus(leftmatrix[row2 * leftcols + col], leftmatrix[row * leftcols + col]);
                                 }
                             }
 
@@ -142,7 +149,7 @@ namespace FastGaloisFields
                             {
                                 if (rightmatrix[row * rows + col] != 0)
                                 {
-                                    rightmatrix[row2 * rows + col] = FastGaloisFieldsUnsafeProcessor.Minus(rightmatrix[row2 * rows + col], rightmatrix[row * rows + col]);
+                                    rightmatrix[row2 * rows + col] = processor.Minus(rightmatrix[row2 * rows + col], rightmatrix[row * rows + col]);
                                 }
                             }
                         }
@@ -153,7 +160,7 @@ namespace FastGaloisFields
                             {
                                 if (leftmatrix[row * leftcols + col] != 0)
                                 {
-                                    leftmatrix[row2 * leftcols + col] = FastGaloisFieldsUnsafeProcessor.Multiply(FastGaloisFieldsUnsafeProcessor.Minus(leftmatrix[row2 * leftcols + col], leftmatrix[row * leftcols + col]), scalevalue);
+                                    leftmatrix[row2 * leftcols + col] = processor.Multiply(processor.Minus(leftmatrix[row2 * leftcols + col], leftmatrix[row * leftcols + col]), scalevalue);
                                 }
                             }
 
@@ -161,7 +168,7 @@ namespace FastGaloisFields
                             {
                                 if (rightmatrix[row * rows + col] != 0)
                                 {
-                                    rightmatrix[row2 * rows + col] = FastGaloisFieldsUnsafeProcessor.Multiply(FastGaloisFieldsUnsafeProcessor.Minus(rightmatrix[row2 * rows + col], rightmatrix[row * rows + col]), scalevalue);
+                                    rightmatrix[row2 * rows + col] = processor.Multiply(processor.Minus(rightmatrix[row2 * rows + col], rightmatrix[row * rows + col]), scalevalue);
                                 }
                             }
                         }

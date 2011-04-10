@@ -22,8 +22,9 @@ namespace Par2NET.Console
          * Create commandline /if:"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\CreateTests\EntLib50.chm" /action:ParCreate /rbc:10 /mtcpu- /mtio-
          * 
          * 
-         * /mtio- /mtcpu- /a:ParVerify /rf:\\VBOXSVR\SharedFolders\Tests\5150.Rue.Des.Ormes.LIMITED.FRENCHDVDRIP.XVID.AC3-TBoss\5150.par2
+         * /mtio- /mtcpu- /a:ParVerify /rf:C:\Users\Jerome\Documents\5150.Rue.Des.Ormes.LIMITED.FRENCHDVDRIP.XVID.AC3-TBoss\5150.par2
          * 
+         * /if:"C:\Users\Jerome\Documents\BigCreate\5150.Rue.Des.Ormes.LIMITED.FRENCHDVDRIP.XVID.AC3-TBoss.part01.rar" /if:"C:\Users\Jerome\Documents\BigCreate\5150.Rue.Des.Ormes.LIMITED.FRENCHDVDRIP.XVID.AC3-TBoss.part02.rar" /if:"C:\Users\Jerome\Documents\BigCreate\5150.Rue.Des.Ormes.LIMITED.FRENCHDVDRIP.XVID.AC3-TBoss.part03.rar" /action:ParCreate /rbc:10 /mtcpu- /mtio-
          * 
          * /if:"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\CreateTests\EntLib50.chm" /if:"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\CreateTests\EntLib50_copy.chm" /if:"C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET\CreateTests\EntLib50_copy2.chm" /rbc:30 /mtio- /mtcpu+ /action:ParCreate
          * 

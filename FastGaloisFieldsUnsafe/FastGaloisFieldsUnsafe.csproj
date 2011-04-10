@@ -42,7 +42,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="FastGaloisFieldsFactory.cs" />
     <Compile Include="FastGaloisFieldsUnsafeProcessor.cs" />
+    <Compile Include="FastGaloisFieldsNativeProcessor.cs" />
+    <Compile Include="IFastGaloisFieldsProcessor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

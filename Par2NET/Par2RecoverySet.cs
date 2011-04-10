@@ -336,7 +336,7 @@ namespace Par2NET
                 {
                     chunksize = MainPacket.blocksize;
 
-                    deferhashcomputation = false;
+                    deferhashcomputation = true;
                 }
             }
 

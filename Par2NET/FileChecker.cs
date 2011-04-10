@@ -246,6 +246,8 @@ namespace Par2NET
                 }
                 else
                 {
+                    long startCheck = DateTime.Now.Ticks;
+
                     int buffer_size = THRESHOLD;
                     int overlap = 1 * blocksize; // part which will be check in double to avoid missing moving blocks
 
@@ -274,6 +276,10 @@ namespace Par2NET
 
                         }
                     }
+
+                    long endCheck = DateTime.Now.Ticks;
+                    double duration = ((double)(endCheck - startCheck)) / 10000;
+                    Console.WriteLine("Check : {0} ms", duration);
                 }
             }
 
@@ -291,238 +297,179 @@ namespace Par2NET
                 matchType = MatchType.NoMatch;
         }
 
-        public static void CheckFile_good(DiskFile diskFile, string filename, int blocksize, List<FileVerificationEntry> fileVerEntry, byte[] md5hash16k, byte[] md5hash, ref MatchType matchType, Dictionary<uint, FileVerificationEntry> hashfull, Dictionary<uint, FileVerificationEntry> hash, List<FileVerificationEntry> expectedList, ref int expectedIndex, bool multithreadCPU)
+        public static void CheckFile_async(DiskFile diskFile, string filename, int blocksize, List<FileVerificationEntry> fileVerEntry, byte[] md5hash16k, byte[] md5hash, ref MatchType matchType, Dictionary<uint,FileVerificationEntry> hashfull, Dictionary<uint,FileVerificationEntry> hash, List<FileVerificationEntry> expectedList, ref int expectedIndex, bool multithreadCPU)
         {
-            // Rewrite with :
-            //  <= 50Mo, one step full buffer
-            // > 50 Mo, two buffer 50Mo with 2*blocksize overlap
+            //int THRESHOLD = ((int)((50 * 1024 * 1024) / blocksize) * blocksize); // 50Mo threshold
+            int THRESHOLD = 5 * blocksize;
 
             matchType = MatchType.FullMatch;
 
             Console.WriteLine("Checking file '{0}'", Path.GetFileName(filename));
 
-            if (multithreadCPU)
-            {
-                List<Task> tasks = new List<Task>();
+            long filesize = new FileInfo(filename).Length;
 
-                int readsize = 5 * blocksize;
-
-                using (SemaphoreSlim concurrencySemaphore = new SemaphoreSlim(Environment.ProcessorCount))
-                {
-                    using (FileStream fs = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read))
-                    {
-                        //int readsize = 5 * blocksize;
-
-                        byte[] buffer1 = new byte[readsize];
-                        byte[] buffer2 = new byte[readsize];
-
-                        int offset = 0;
-
-                        int nbRead1 = fs.Read(buffer1, 0, readsize);
-
-                        while (fs.Position < fs.Length)
-                        {
-                            int nbRead2 = fs.Read(buffer2, 0, readsize);
-
-                            byte[] buffer = new byte[nbRead1 + nbRead2];
-
-                            Buffer.BlockCopy(buffer1, 0, buffer, 0, nbRead1);
-                            Buffer.BlockCopy(buffer2, 0, buffer, nbRead1, nbRead2);
-
-                            tasks.Add(Task.Factory.StartNew((arg)
-                                =>
-                            {
-                                try
-                                {
-                                    object[] args = (object[])arg;
-
-                                    byte[] b = (byte[])args[0];
-                                    DiskFile df = (DiskFile)args[1];
-                                    string f = (string)args[2];
-                                    int bs = (int)args[3];
-                                    Dictionary<uint, FileVerificationEntry> hf = (Dictionary<uint, FileVerificationEntry>)args[4];
-                                    MatchType mt = (MatchType)args[5];
-                                    int o = (int)args[6];
-
-                                    CheckBuffer(b, df, f, bs, hf, ref mt, o);
-                                }
-                                finally
-                                {
-                                    //concurrencySemaphore.Release();
-                                }
-                            }, new object[] { buffer, diskFile, filename, blocksize, hashfull, matchType, offset }));
-
-                            offset += buffer.Length;
-
-                            Array.Clear(buffer1, 0, nbRead1);
-                            byte[] tmpBuf = buffer1;
-
-                            buffer1 = buffer2;
-
-                            buffer2 = tmpBuf;
-                        }
-                    }
-
-                    long startWait = DateTime.Now.Ticks;
-                    Task.WaitAll(tasks.ToArray());
-                    long endWait = DateTime.Now.Ticks;
-                    double duration = ((double)(endWait - startWait)) / 10000;
-                    Console.WriteLine("Wait : {0}ms", duration);
-                }
-            }
-            else
-            {
-                using (FileStream fs = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read))
-                {
-                    int readsize = 5 * blocksize;
-
-                    byte[] buffer1 = new byte[readsize];
-                    byte[] buffer2 = new byte[readsize];
-
-                    int offset = 0;
-
-                    int nbRead1 = fs.Read(buffer1, 0, readsize);
-
-                    while (fs.Position < fs.Length)
-                    {
-                        int nbRead2 = fs.Read(buffer2, 0, readsize);
-
-                        byte[] buffer = new byte[nbRead1 + nbRead2];
-
-                        Buffer.BlockCopy(buffer1, 0, buffer, 0, nbRead1);
-                        Buffer.BlockCopy(buffer2, 0, buffer, nbRead1, nbRead2);
-
-                        CheckBuffer(buffer, diskFile, filename, blocksize, hashfull, ref matchType, offset);
-
-                        offset += buffer.Length;
-
-                        Array.Clear(buffer1, 0, nbRead1);
-                        byte[] tmpBuf = buffer1;
-
-                        buffer1 = buffer2;
-
-                        buffer2 = tmpBuf;
-                    }
-                }
-            }
-
-            bool atLeastOne = false;
-            foreach (FileVerificationEntry entry in fileVerEntry)
-            {
-                if (entry.datablock.diskfile != null)
-                {
-                    atLeastOne = true;
-                    break;
-                }
-            }
-
-            if (!atLeastOne)
-                matchType = MatchType.NoMatch;
-        }
-        
-        public static void CheckFile_orig(DiskFile diskFile, string filename, int blocksize, List<FileVerificationEntry> fileVerEntry, byte[] md5hash16k, byte[] md5hash, ref MatchType matchType, Dictionary<uint, FileVerificationEntry> hashfull, Dictionary<uint, FileVerificationEntry> hash, List<FileVerificationEntry> expectedList, ref int expectedIndex, bool multithreadCPU)
-        {
-            matchType = MatchType.FullMatch;
-
-            Console.WriteLine("Checking file '{0}'", Path.GetFileName(filename));
-
-            if (multithreadCPU)
-            {
-                List<Task> tasks = new List<Task>();
-
-                int readsize = 1 * blocksize;
-
-                using (SemaphoreSlim concurrencySemaphore = new SemaphoreSlim(Environment.ProcessorCount))
-                {
-
-                    //using (BinaryReader br = new BinaryReader(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read, readsize*2, FileOptions.SequentialScan)))
-                    using (BinaryReader br = new BinaryReader(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read, readsize, FileOptions.SequentialScan)))
-                    {
-                        byte[] buffer1 = null;
-                        byte[] buffer2 = null;
-
-                        //int readsize = 5 * blocksize;
-
-                        int offset = 0;
-
-                        buffer1 = br.ReadBytes(readsize);
-
-                        while (br.BaseStream.Position < br.BaseStream.Length)
-                        {
-                            buffer2 = br.ReadBytes(readsize);
-
-                            byte[] buffer = new byte[buffer1.Length + buffer2.Length];
-
-                            Buffer.BlockCopy(buffer1, 0, buffer, 0, buffer1.Length);
-                            Buffer.BlockCopy(buffer2, 0, buffer, buffer1.Length, buffer2.Length);
-                            //concurrencySemaphore.Wait();
-
-                            tasks.Add(Task.Factory.StartNew((arg)
-                                =>
-                            {
-                                try
-                                {
-                                    object[] args = (object[])arg;
-
-                                    byte[] b = (byte[])args[0];
-                                    DiskFile df = (DiskFile)args[1];
-                                    string f = (string)args[2];
-                                    int bs = (int)args[3];
-                                    Dictionary<uint, FileVerificationEntry> hf = (Dictionary<uint, FileVerificationEntry>)args[4];
-                                    MatchType mt = (MatchType)args[5];
-                                    int o = (int)args[6];
-
-                                    CheckBuffer(b, df, f, bs, hf, ref mt, o);
-                                }
-                                finally
-                                {
-                                    //concurrencySemaphore.Release();
-                                }
-                            }, new object[] { buffer, diskFile, filename, blocksize, hashfull, matchType, offset }));
-
-
-                            offset += buffer.Length;
-
-                            buffer1 = buffer2;
-                        }
-
-                    }
-
-                    long startWait = DateTime.Now.Ticks;
-                    Task.WaitAll(tasks.ToArray());
-                    long endWait = DateTime.Now.Ticks;
-                    double duration = ((double)(endWait - startWait)) / 10000;
-                    Console.WriteLine("Wait : {0}ms", duration);
-                }
-            }
-            else
+            if (filesize <= THRESHOLD)
             {
                 using (BinaryReader br = new BinaryReader(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read)))
                 {
-                    byte[] buffer1 = null;
-                    byte[] buffer2 = null;
+                    CheckBuffer(br.ReadBytes((int)filesize), diskFile, filename, blocksize, hashfull, ref matchType, 0);
+                }
+            }
+            else
+            {
+                if (multithreadCPU)
+                {
+                    List<Task> tasks = new List<Task>();
 
-                    int readsize = 5 * blocksize;
+                    int buffer_size = THRESHOLD;
+                    int overlap = 1 * blocksize; // part which will be check in double to avoid missing moving blocks
 
-                    int offset = 0;
+                    List<ManualResetEvent> list = new List<ManualResetEvent>();
 
-                    buffer1 = br.ReadBytes(readsize);
-
-                    while (br.BaseStream.Position < br.BaseStream.Length)
+                    using (FileStream fs = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read, 1024, true))
                     {
-                        buffer2 = br.ReadBytes(readsize);
+                        int offset = 0;
 
-                        byte[] buffer = new byte[buffer1.Length + buffer2.Length];
+                        byte[] buffer = new byte[buffer_size];
 
-                        Buffer.BlockCopy(buffer1, 0, buffer, 0, buffer1.Length);
-                        Buffer.BlockCopy(buffer2, 0, buffer, buffer1.Length, buffer2.Length);
+                        ManualResetEvent mre = new ManualResetEvent(false);
+                        list.Add(mre);
 
-                        CheckBuffer(buffer, diskFile, filename, blocksize, hashfull, ref matchType, offset);
+                        CheckBufferState state = new CheckBufferState(buffer, diskFile, filename, blocksize, hashfull, matchType, offset, overlap);
 
-                        offset += buffer.Length;
+                        fs.BeginRead(buffer, 0, buffer_size, new AsyncCallback(TaskEndReadCallback), new FileCheckerState(fs, buffer, mre, state));
 
-                        buffer1 = buffer2;
+                        //tasks.Add(Task.Factory.StartNew((arg)
+                        //        =>
+                        //{
+                        //    try
+                        //    {
+                        //        object[] args = (object[])arg;
+
+                        //        byte[] b = (byte[])args[0];
+                        //        DiskFile df = (DiskFile)args[1];
+                        //        string f = (string)args[2];
+                        //        int bs = (int)args[3];
+                        //        Dictionary<uint, FileVerificationEntry> hf = (Dictionary<uint, FileVerificationEntry>)args[4];
+                        //        MatchType mt = (MatchType)args[5];
+                        //        int o = (int)args[6];
+
+                        //        CheckBuffer(b, df, f, bs, hf, ref mt, o);
+                        //    }
+                        //    finally
+                        //    {
+                        //        //concurrencySemaphore.Release();
+                        //    }
+                        //}, new object[] { buffer, diskFile, filename, blocksize, hashfull, matchType, offset }));
+
+                        while (fs.Position < fs.Length)
+                        {
+                            Buffer.BlockCopy(buffer, buffer.Length - overlap, buffer, 0, overlap);
+
+                            ManualResetEvent mre2 = new ManualResetEvent(false);
+                            list.Add(mre2);
+
+                            CheckBufferState state2 = new CheckBufferState(buffer, diskFile, filename, blocksize, hashfull, matchType, offset, overlap);
+
+                            fs.BeginRead(buffer, overlap, buffer.Length - overlap, new AsyncCallback(TaskEndReadCallback), new FileCheckerState(fs, buffer, mre2, state2));
+
+                            int nbRead = fs.Read(buffer, overlap, buffer.Length - overlap);
+
+                            offset += buffer.Length - overlap;
+
+                            //if (nbRead < buffer.Length - overlap)
+                            //    Array.Clear(buffer, (nbRead + overlap), buffer_size - (nbRead + overlap));
+
+                            //tasks.Add(Task.Factory.StartNew((arg)
+                            //    =>
+                            //{
+                            //    try
+                            //    {
+                            //        object[] args = (object[])arg;
+
+                            //        byte[] b = (byte[])args[0];
+                            //        DiskFile df = (DiskFile)args[1];
+                            //        string f = (string)args[2];
+                            //        int bs = (int)args[3];
+                            //        Dictionary<uint, FileVerificationEntry> hf = (Dictionary<uint, FileVerificationEntry>)args[4];
+                            //        MatchType mt = (MatchType)args[5];
+                            //        int o = (int)args[6];
+
+                            //        CheckBuffer(b, df, f, bs, hf, ref mt, o);
+                            //    }
+                            //    finally
+                            //    {
+                            //        //concurrencySemaphore.Release();
+                            //    }
+                            //}, new object[] { (byte[])buffer.Clone(), diskFile, filename, blocksize, hashfull, matchType, offset }));
+
+                        }
                     }
+
+                    //long startWait = DateTime.Now.Ticks;
+                    //Task.WaitAll(tasks.ToArray());
+                    //long endWait = DateTime.Now.Ticks;
+                    //double duration = ((double)(endWait - startWait)) / 10000;
+                    //Console.WriteLine("Wait : {0}ms", duration);
+
+                    WaitHandle.WaitAll(list.ToArray());
+                }
+                else
+                {
+                    long startCheck = DateTime.Now.Ticks;
+
+                    int buffer_size = THRESHOLD;
+                    int overlap = 1 * blocksize; // part which will be check in double to avoid missing moving blocks
+
+                    List<ManualResetEvent> list = new List<ManualResetEvent>();
+
+                    using (FileStream fs = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read, 2 * buffer_size, true))
+                    {
+                        int offset = 0;
+
+                        byte[] buffer = new byte[buffer_size];
+
+                        CheckBufferState state = new CheckBufferState(buffer, diskFile, filename, blocksize, hashfull, matchType, offset, overlap);
+
+                        ManualResetEvent mre = new ManualResetEvent(false);
+                        list.Add(mre);
+
+                        // Create a synchronization object that gets 
+                        // signaled when verification is complete.
+                        fs.BeginRead(buffer, 0, buffer_size, new AsyncCallback(EndReadCallback), new FileCheckerState(fs, buffer, mre, state));
+
+                        //CheckBuffer(buffer, diskFile, filename, blocksize, hashfull, ref matchType, offset);
+
+                        while (fs.Position < fs.Length)
+                        {
+                            Buffer.BlockCopy(buffer, buffer.Length - overlap, buffer, 0, overlap);
+
+                            //int nbRead = fs.Read(buffer, overlap, buffer.Length - overlap);
+
+                            CheckBufferState state2 = new CheckBufferState(buffer, diskFile, filename, blocksize, hashfull, matchType, offset, overlap);
+
+                            // Create a synchronization object that gets 
+                            // signaled when verification is complete.
+                            ManualResetEvent mre2 = new ManualResetEvent(false);
+                            list.Add(mre2);
+
+                            fs.BeginRead(buffer, 0, buffer_size, new AsyncCallback(EndReadCallback), new FileCheckerState(fs, buffer, mre2, state2));
+
+                            offset += buffer_size;
+
+                            //if (nbRead < buffer.Length - overlap)
+                            //    Array.Clear(buffer, (nbRead + overlap), buffer_size - (nbRead + overlap));
+
+                            //CheckBuffer(buffer, diskFile, filename, blocksize, hashfull, ref matchType, offset);
+
+                        }
+
+                        WaitHandle.WaitAll(list.ToArray());
+                    }
+
+                    long endCheck = DateTime.Now.Ticks;
+                    double duration = ((double)(endCheck - startCheck)) / 10000;
+                    Console.WriteLine("Check : {0} ms", duration);
                 }
             }
 
@@ -538,6 +485,64 @@ namespace Par2NET
 
             if (!atLeastOne)
                 matchType = MatchType.NoMatch;
+        }
+
+        // When BeginRead is finished reading data from the file, the 
+        // EndReadCallback method is called to end the asynchronous 
+        // read operation and then verify the data.
+        static void EndReadCallback(IAsyncResult asyncResult)
+        {
+            FileCheckerState tempState = (FileCheckerState)asyncResult.AsyncState;
+            int readCount = tempState.FStream.EndRead(asyncResult);
+
+            if (readCount < tempState.State.Buffer.Length - tempState.State.Overlap)
+                Array.Clear(tempState.State.Buffer, (readCount + tempState.State.Overlap), tempState.State.Buffer.Length - (readCount + tempState.State.Overlap));
+
+            CheckBufferState state = tempState.State;
+
+            MatchType matchType = MatchType.FullMatch;
+
+            CheckBuffer(state.Buffer, state.DiskFile, state.FileName, state.BlockSize, state.HashFull, ref matchType, state.Offset);
+
+            state.MatchType = matchType;
+
+            //tempState.FStream.Close();
+
+            // Signal the main thread that the verification is finished.
+            tempState.ManualEvent.Set();
+        }
+
+        static void TaskEndReadCallback(IAsyncResult asyncResult)
+        {
+            FileCheckerState tempState = (FileCheckerState)asyncResult.AsyncState;
+            int readCount = tempState.FStream.EndRead(asyncResult);
+
+            if (readCount < tempState.State.Buffer.Length - tempState.State.Overlap)
+                Array.Clear(tempState.State.Buffer, (readCount + tempState.State.Overlap), tempState.State.Buffer.Length - (readCount + tempState.State.Overlap));
+
+            CheckBufferState state = tempState.State;
+
+            Task.Factory.StartNew((arg)
+                =>
+            {
+                try
+                {
+                    CheckBufferState innerState =  (CheckBufferState)arg;
+                    
+                    MatchType matchType = MatchType.FullMatch;
+                    CheckBuffer(state.Buffer, state.DiskFile, state.FileName, state.BlockSize, state.HashFull, ref matchType, state.Offset);
+                    state.MatchType = matchType;
+
+                    // Signal the main thread that the verification is finished.
+                    tempState.ManualEvent.Set();
+                }
+                finally
+                {
+                    //concurrencySemaphore.Release();
+                }
+            }, state);
+
+            //tempState.FStream.Close();
         }
     }
 }

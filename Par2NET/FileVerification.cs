@@ -160,12 +160,14 @@ namespace Par2NET
                 FileVerificationPacket.fileid = (byte[])FileDescriptionPacket.fileid.Clone();
 
                 // Compute full file MD5 hash & block CRC32 and MD5 hashes
-                long readSize = 5 * (long)blocksize;
+                //long readSize = 5 * (long)blocksize;
+                long readSize = (long)blocksize;
                 long fileSize = new FileInfo(filename).Length;
                 long nbSteps =  fileSize / readSize;
                 long remaining = fileSize % readSize;
                 uint blocknumber = 0;
 
+                // TODO : switch to async filestream
                 using (BinaryReader br = new BinaryReader(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read)))
                 {
                     MD5 md5FullHasher = MD5.Create();
@@ -184,38 +186,30 @@ namespace Par2NET
                         else
                             md5FullHasher.TransformBlock(buffer, 0, buffer.Length, null, 0);
 
-                        for (uint j = 0; j < 5; ++j)
-                        {
+                        //for (uint j = 0; j < 5; ++j)
+                        //{
                             // Block MD5 hash & CRC32
                             uint length = (uint)blocksize;
 
-                            if (i == nbSteps && j == 4)
+                            //if (i == nbSteps && j == 4)
+                            //if (i == nbSteps && (buffer.Length - (uint)(j * blocksize))  < (int)blocksize)
+                            if (i == nbSteps && remaining != 0)
                             {
-                                if (remaining % (long)blocksize != 0)
-                                {
-                                    // We need arry padding since calculation **MUST** always be done on blocksize-length buffers
-                                    byte[] smallBuffer = buffer;
-                                    buffer = new byte[5*blocksize];
-                                    Buffer.BlockCopy(smallBuffer, 0, buffer, 0, smallBuffer.Length);
-                                }
+                                // We need arry padding since calculation **MUST** always be done on blocksize-length buffers
+                                byte[] smallBuffer = buffer;
+                                buffer = new byte[blocksize];
+                                Buffer.BlockCopy(smallBuffer, 0, buffer, 0, smallBuffer.Length);
                             }
                             
-                            blockCRC32 = crc32.CRCUpdateBlock(0xFFFFFFFF, (uint)blocksize, buffer, (uint)(j * blocksize)) ^ 0xFFFFFFFF;
-                            blockHash = md5Hasher.ComputeHash(buffer, (int)(j * blocksize), (int)blocksize);
+                            blockCRC32 = crc32.CRCUpdateBlock(0xFFFFFFFF, (uint)blocksize, buffer, 0) ^ 0xFFFFFFFF;
+                            blockHash = md5Hasher.ComputeHash(buffer, 0, (int)blocksize);
 
-                            FileVerificationPacket.SetBlockHashAndCRC((uint)(i*j), blockHash, blockCRC32);
-                        }
+                            //Console.WriteLine("blocknumber:{0},hash:{1},crc32:{2}", blocknumber, blockHash, blockCRC32);
+                            FileVerificationPacket.SetBlockHashAndCRC(blocknumber++, blockHash, blockCRC32);
+                        //}
                     }
 
                     FileDescriptionPacket.hashfull = md5FullHasher.Hash;
-                }
-
-
-                using (BinaryReader br = new BinaryReader(new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read)))
-                {
-                    MD5 md5Hasher = MD5.Create();
-                    byte[] buffer16k = br.ReadBytes(16 * 1024);
-                    FileDescriptionPacket.hash16k = md5Hasher.ComputeHash(buffer16k);
                 }
             }
 
@@ -256,7 +250,8 @@ namespace Par2NET
 
             // Finish computation of the full file hash
             // Store it in the description
-            this.FileDescriptionPacket.hashfull = contextfull.TransformFinalBlock(new byte[] {}, 0, 0);
+            //this.FileDescriptionPacket.hashfull = contextfull.TransformFinalBlock(new byte[] {}, 0, 0);
+            this.FileDescriptionPacket.hashfull = contextfull.Hash;
         }
 
         internal void UpdateHashes(uint blocknumber, byte[] buffer, ulong length)
@@ -280,8 +275,10 @@ namespace Par2NET
 
                 Debug.Assert(contextfull != null);
 
-                contextfull.TransformBlock(buffer, 0, buffer.Length, null, 0);
-                //contextfull.ComputeHash(buffer, 0, (int)length);
+                if (blocknumber < blockcount-1)
+                    contextfull.TransformBlock(buffer, 0, (int)length, null, 0);
+                else
+                    contextfull.TransformFinalBlock(buffer, 0, (int)length);
             }
         }
     }

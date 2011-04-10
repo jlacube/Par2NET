@@ -8,21 +8,36 @@ using System.Runtime.InteropServices;
 
 namespace FastGaloisFieldsUnsafe
 {
-    public sealed class FastGaloisFieldsUnsafeProcessor
+    public sealed class FastGaloisFieldsUnsafeProcessor : IFastGaloisFieldsProcessor
     {
-        static uint bits = 16;
-        static uint generator = 0x1100B;
+        uint bits = 16;
+        uint generator = 0x1100B;
 
-        public static uint count = 0;
-        public static uint limit = 0;
+        public uint count = 0;
+        public uint _limit = 0;
 
-        public static ushort[] log = null;
-        public static ushort[] antilog = null;
+        public ushort[] log = null;
+        public ushort[] antilog = null;
 
-        static FastGaloisFieldsUnsafeProcessor()
+        private static FastGaloisFieldsUnsafeProcessor instance = null;
+
+        public static IFastGaloisFieldsProcessor GetInstance
+        {
+            get
+            {
+                if (instance == null)
+                {
+                    instance = new FastGaloisFieldsUnsafeProcessor();
+                }
+
+                return instance;
+            }
+        }
+
+        private FastGaloisFieldsUnsafeProcessor()
         {
             count = (uint)(1 << (int)bits);
-            limit = count - 1;
+            _limit = count - 1;
 
             log = new ushort[count];
             antilog = new ushort[count];
@@ -44,7 +59,7 @@ namespace FastGaloisFieldsUnsafe
             antilog[limit] = 0;
         }
 
-        public static ushort Multiply(ushort a, ushort b)
+        public ushort Multiply(ushort a, ushort b)
         {
             if (a == 0 || b == 0)
                 return 0;
@@ -61,7 +76,7 @@ namespace FastGaloisFieldsUnsafe
             }
         }
 
-        public static ushort Divide(ushort a, ushort b)
+        public ushort Divide(ushort a, ushort b)
         {
             if (a == 0) return 0;
 
@@ -79,7 +94,7 @@ namespace FastGaloisFieldsUnsafe
             }
         }
 
-        public static ushort Pow(ushort a, ushort b)
+        public ushort Pow(ushort a, ushort b)
         {
             if (b == 0)
                 return 1;
@@ -100,17 +115,17 @@ namespace FastGaloisFieldsUnsafe
             }
         }
 
-        public static ushort Add(ushort a, ushort b)
+        public ushort Add(ushort a, ushort b)
         {
             return (ushort)(a ^ b);
         }
 
-        public static ushort Minus(ushort a, ushort b)
+        public ushort Minus(ushort a, ushort b)
         {
             return (ushort)(a ^ b);
         }
 
-        public static bool InternalProcess(ushort factor, uint size, byte[] inputbuffer, byte[] outputbuffer, int startIndex, uint length)
+        public bool InternalProcess(ushort factor, uint size, byte[] inputbuffer, byte[] outputbuffer, int startIndex, uint length)
         {
             try
             {
@@ -144,6 +159,16 @@ namespace FastGaloisFieldsUnsafe
 #endif
                 return false;
             }
+        }
+
+        public uint limit
+        {
+            get { return _limit; }
+        }
+
+        public ushort GetAntilog(int index)
+        {
+            return antilog[index];
         }
     }
 }

@@ -33,15 +33,19 @@ namespace FastGaloisFields
         //Galois16[] leftmatrix = null;       // The main matrix
         ushort[] leftmatrix = null;       // The main matrix
 
-        GaloisLongMultiplyTable16 glmt;
+        //GaloisLongMultiplyTable16 glmt;
 
         // When the matrices are initialised: values of the form base ^ exponent are
         // stored (where the base values are obtained from database[] and the exponent
         // values are obtained from outputrows[]).
 
+        IFastGaloisFieldsProcessor processor;
+
         public ReedSolomonGalois16()
         {
-            glmt = new GaloisLongMultiplyTable16();
+            //glmt = new GaloisLongMultiplyTable16();
+
+            processor = FastGaloisFieldsFactory.GetProcessor();
         }
 
         public bool Process(uint size, uint inputindex, byte[] inputbuffer, uint outputindex, byte[] outputbuffer, int startIndex, uint length)
@@ -115,7 +119,8 @@ namespace FastGaloisFields
             {
                 //FastGaloisFieldsUnsafeProcessor unsafeProcessor = new FastGaloisFieldsUnsafeProcessor();
                 //return unsafeProcessor.InternalProcess(factor, size, inputbuffer, outputbuffer, startIndex, length);
-                return FastGaloisFieldsUnsafeProcessor.InternalProcess(factor, size, inputbuffer, outputbuffer, startIndex, length);
+                //return FastGaloisFieldsUnsafeProcessor.InternalProcess(factor, size, inputbuffer, outputbuffer, startIndex, length);
+                return processor.InternalProcess(factor, size, inputbuffer, outputbuffer, startIndex, length);
             }
             catch (SecurityException)
             {
@@ -205,12 +210,12 @@ namespace FastGaloisFields
                 // Determine the next useable base value.
                 // Its log must must be relatively prime to 65535
                 //while (gcd(G.Limit, logbase) != 1)
-                while (gcd(FastGaloisFieldsUnsafeProcessor.limit, logbase) != 1)
+                while (gcd(processor.limit, logbase) != 1)
                 {
                     logbase++;
                 }
                 //if (logbase >= G.Limit)
-                if (logbase >= FastGaloisFieldsUnsafeProcessor.limit)
+                if (logbase >= processor.limit)
                 {
                     //cerr << "Too many input blocks for Reed Solomon matrix." << endl;
                     return false;
@@ -218,7 +223,7 @@ namespace FastGaloisFields
 
 
                 //ushort ibase = new Galois16((ushort)logbase++).ALog();
-                ushort ibase = FastGaloisFieldsUnsafeProcessor.antilog[(ushort)logbase++];
+                ushort ibase = processor.GetAntilog((ushort)logbase++);
 
                 database[index] = ibase;
             }
@@ -252,19 +257,19 @@ namespace FastGaloisFields
                 // Determine the next useable base value.
                 // Its log must must be relatively prime to 65535
                 //while (gcd(G.Limit, logbase) != 1)
-                while (gcd(FastGaloisFieldsUnsafeProcessor.limit, logbase) != 1)
+                while (gcd(processor.limit, logbase) != 1)
                 {
                     logbase++;
                 }
                 //if (logbase >= G.Limit)
-                if (logbase >= FastGaloisFieldsUnsafeProcessor.limit)
+                if (logbase >= processor.limit)
                 {
                     //cerr << "Too many input blocks for Reed Solomon matrix." << endl;
                     return false;
                 }
 
                 //ushort ibase = new Galois16((ushort)logbase++).ALog();
-                ushort ibase = FastGaloisFieldsUnsafeProcessor.antilog[(ushort)logbase++];
+                ushort ibase = processor.GetAntilog((ushort)logbase++);
 
                 database[index] = ibase;
             }
@@ -365,7 +370,7 @@ namespace FastGaloisFields
                 for (uint col = 0; col < datapresent; col++)
                 {
                     //leftmatrix[row * incount + col] = Galois16.Pow(new Galois16(database[datapresentindex[col]]), new Galois16(exponent));
-                    leftmatrix[row * incount + col] = FastGaloisFieldsUnsafeProcessor.Pow(database[datapresentindex[col]], exponent);
+                    leftmatrix[row * incount + col] = processor.Pow(database[datapresentindex[col]], exponent);
                 }
 
                 // One column for each each present recovery block that will be used for a missing data block
@@ -381,7 +386,7 @@ namespace FastGaloisFields
                     for (uint col = 0; col < datamissing; col++)
                     {
                         //rightmatrix[row * outcount + col] = Galois16.Pow(new Galois16(database[datamissingindex[col]]), new Galois16(exponent));
-                        rightmatrix[row * outcount + col] = FastGaloisFieldsUnsafeProcessor.Pow(database[datamissingindex[col]], exponent);
+                        rightmatrix[row * outcount + col] = processor.Pow(database[datamissingindex[col]], exponent);
                     }
                     // One column for each missing recovery block
                     for (uint col = 0; col < parmissing; col++)
@@ -416,7 +421,7 @@ namespace FastGaloisFields
                 for (uint col = 0; col < datapresent; col++)
                 {
                     //leftmatrix[(row + datamissing) * incount + col] = Galois16.Pow(new Galois16(database[datapresentindex[col]]), new Galois16(exponent));
-                    leftmatrix[(row + datamissing) * incount + col] = FastGaloisFieldsUnsafeProcessor.Pow(database[datapresentindex[col]], exponent);
+                    leftmatrix[(row + datamissing) * incount + col] = processor.Pow(database[datapresentindex[col]], exponent);
                 }
                 // One column for each each present recovery block that will be used for a missing data block
                 for (uint col = 0; col < datamissing; col++)
@@ -430,7 +435,7 @@ namespace FastGaloisFields
                     for (uint col = 0; col < datamissing; col++)
                     {
                         //rightmatrix[(row + datamissing) * outcount + col] = Galois16.Pow(new Galois16(database[datamissingindex[col]]), new Galois16(exponent));
-                        rightmatrix[(row + datamissing) * outcount + col] = FastGaloisFieldsUnsafeProcessor.Pow(database[datamissingindex[col]], exponent);
+                        rightmatrix[(row + datamissing) * outcount + col] = processor.Pow(database[datamissingindex[col]], exponent);
                     }
                     // One column for each missing recovery block
                     for (uint col = 0; col < parmissing; col++)
