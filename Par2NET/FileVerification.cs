@@ -7,6 +7,7 @@ using Par2NET.Packets;
 using System.IO;
 using System.Security.Cryptography;
 using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace Par2NET
 {
@@ -27,8 +28,9 @@ namespace Par2NET
         private string targetfilename = string.Empty;      // The filename of the target file
         private string parfilename = string.Empty;          // The filename of the par2 target file
 
-        private MD5 contextfull = null;
+        private MD5 contextfull = MD5.Create();
         private FastCRC32.FastCRC32 crc32 = null;
+        private MD5 blockcontext = MD5.Create();
 
         public string TargetFileName
         {
@@ -259,26 +261,49 @@ namespace Par2NET
             // Compute the crc and hash of the data
             unchecked
             {
-                uint blockcrc = (uint)~0 ^ crc32.CRCUpdateBlock((uint)~0, (uint)length, buffer, 0);
+                Task<uint> crc32task = Task.Factory.StartNew<uint>(() => { return (uint)~0 ^ crc32.CRCUpdateBlock((uint)~0, (uint)length, buffer, 0); });
+                Task<byte[]> blockhashtask = Task.Factory.StartNew<byte[]>(() => { return blockcontext.ComputeHash(buffer, 0, (int)length); });
+                Task md5fulltask = Task.Factory.StartNew(()
+                    =>
+                    {
+                        if ((ulong)length > filesize - blocknumber * (ulong)length)
+                        {
+                            length = (ulong)(filesize - blocknumber * (ulong)length);
+                        }
 
-                MD5 blockcontext = MD5.Create();
-                byte[] blockhash = blockcontext.ComputeHash(buffer, 0, (int)length);
+                        Debug.Assert(contextfull != null);
+
+                        if (blocknumber < blockcount - 1)
+                            contextfull.TransformBlock(buffer, 0, (int)length, null, 0);
+                        else
+                            contextfull.TransformFinalBlock(buffer, 0, (int)length);
+                    });
+
+                Task.WaitAll(crc32task, blockhashtask);
+
+                this.FileVerificationPacket.SetBlockHashAndCRC(blocknumber, blockhashtask.Result, crc32task.Result);
+
+                Task.WaitAll(md5fulltask);
+                //uint blockcrc = (uint)~0 ^ crc32.CRCUpdateBlock((uint)~0, (uint)length, buffer, 0);
+
+                //MD5 blockcontext = MD5.Create();
+                //byte[] blockhash = blockcontext.ComputeHash(buffer, 0, (int)length);
 
                 // Store the results in the verification packet
-                this.FileVerificationPacket.SetBlockHashAndCRC(blocknumber, blockhash, blockcrc);
+                //this.FileVerificationPacket.SetBlockHashAndCRC(blocknumber, blockhash, blockcrc);
 
                 // Update the full file hash, but don't go beyond the end of the file
-                if ((ulong)length > filesize - blocknumber * (ulong)length)
-                {
-                    length = (ulong)(filesize - blocknumber * (ulong)length);
-                }
+                //if ((ulong)length > filesize - blocknumber * (ulong)length)
+                //{
+                //    length = (ulong)(filesize - blocknumber * (ulong)length);
+                //}
 
-                Debug.Assert(contextfull != null);
+                //Debug.Assert(contextfull != null);
 
-                if (blocknumber < blockcount-1)
-                    contextfull.TransformBlock(buffer, 0, (int)length, null, 0);
-                else
-                    contextfull.TransformFinalBlock(buffer, 0, (int)length);
+                //if (blocknumber < blockcount-1)
+                //    contextfull.TransformBlock(buffer, 0, (int)length, null, 0);
+                //else
+                //    contextfull.TransformFinalBlock(buffer, 0, (int)length);
             }
         }
     }
