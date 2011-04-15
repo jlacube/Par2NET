@@ -10,7 +10,7 @@ namespace FastCRC32
     public class FastCRC32
     {
         private static uint[] crcTable = null;
-        private static uint[] windowTable = null;
+        private uint[] windowTable = null;
         private static bool not_init = true;
 
         public uint windowMask = 0;
@@ -76,10 +76,13 @@ namespace FastCRC32
 
         protected FastCRC32(ulong window)
         {
-            GenerateCRC32Table();
-            GenerateWindowTable(window);
-            windowMask = ComputeWindowMask(window);
-            _mre.Set();
+            Task.Factory.StartNew(() =>
+            {
+                GenerateCRC32Table();
+                GenerateWindowTable(window);
+                windowMask = ComputeWindowMask(window);
+                _mre.Set();
+            });
         }
 
         private void GenerateCRC32Table()
@@ -92,29 +95,29 @@ namespace FastCRC32
 
                     uint polynomial = 0xEDB88320;
 
-                    //for (uint i = 0; i <= 255; i++)
-                    //{
-                    //    uint crc = i;
+                    for (uint i = 0; i <= 255; i++)
+                    {
+                        uint crc = i;
 
-                    //    for (uint j = 0; j < 8; j++)
-                    //    {
-                    //        crc = (crc >> 1) ^ ((crc & 1) != 0 ? polynomial : 0);
-                    //    }
-
-                    //    crcTable[i] = crc;
-                    //}
-
-                    Parallel.For(0, 255, i =>
+                        for (uint j = 0; j < 8; j++)
                         {
-                            uint crc = (uint)i;
+                            crc = (crc >> 1) ^ ((crc & 1) != 0 ? polynomial : 0);
+                        }
 
-                            for (uint j = 0; j < 8; j++)
-                            {
-                                crc = (crc >> 1) ^ ((crc & 1) != 0 ? polynomial : 0);
-                            }
+                        crcTable[i] = crc;
+                    }
 
-                            crcTable[i] = crc;
-                        });
+                    //Parallel.For(0, 255, i =>
+                    //    {
+                    //        uint crc = (uint)i;
+
+                    //        for (uint j = 0; j < 8; j++)
+                    //        {
+                    //            crc = (crc >> 1) ^ ((crc & 1) != 0 ? polynomial : 0);
+                    //        }
+
+                    //        crcTable[i] = crc;
+                    //    });
                 }
             }
         }
