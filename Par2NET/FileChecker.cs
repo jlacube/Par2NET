@@ -63,12 +63,15 @@ namespace Par2NET
 
         private static object _readerSyncObject = new object();
 
+       
+
         private static void CheckBuffer(byte[] buffer, DiskFile diskFile, string filename, int blocksize, Dictionary<uint, FileVerificationEntry> hashfull, ref MatchType matchType, int globalOffset)
         {
             uint partial_key = (uint)(Path.GetFileName(filename).GetHashCode());
 
             MD5 md5Hasher = MD5.Create();
-            FastCRC32.FastCRC32 crc32 = new FastCRC32.FastCRC32((ulong)blocksize);
+            //FastCRC32.FastCRC32 crc32 = new FastCRC32.FastCRC32((ulong)blocksize);
+            FastCRC32.FastCRC32 crc32 = FastCRC32.FastCRC32.GetCRC32Instance((ulong)blocksize);
 
             int offset = 0;
 

@@ -174,7 +174,8 @@ namespace Par2NET
                 {
                     MD5 md5FullHasher = MD5.Create();
                     MD5 md5Hasher = MD5.Create();
-                    FastCRC32.FastCRC32 crc32 = new FastCRC32.FastCRC32(blocksize);
+                    //FastCRC32.FastCRC32 crc32 = new FastCRC32.FastCRC32(blocksize);
+                    FastCRC32.FastCRC32 crc32 = FastCRC32.FastCRC32.GetCRC32Instance(blocksize);
 
                     byte[] blockHash = new byte[16];
                     uint blockCRC32 = 0;
@@ -233,7 +234,8 @@ namespace Par2NET
 
         internal void InitialiseSourceBlocks(ref List<DataBlock> sourceblocks, ulong blocksize)
         {
-            crc32 = new FastCRC32.FastCRC32(blocksize);
+            //crc32 = new FastCRC32.FastCRC32(blocksize);
+            crc32 = FastCRC32.FastCRC32.GetCRC32Instance(blocksize);
             //contextfull = MD5.Create();
 
             for (uint blocknum = 0; blocknum < blockcount; blocknum++)

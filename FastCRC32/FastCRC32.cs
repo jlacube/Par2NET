@@ -2,18 +2,87 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
+using System.Threading;
 
 namespace FastCRC32
 {
     public class FastCRC32
     {
-        private readonly static uint[] crcTable = null;
+        private static uint[] crcTable = null;
         private static uint[] windowTable = null;
         private static bool not_init = true;
 
         public uint windowMask = 0;
 
-        static FastCRC32()
+        //static FastCRC32()
+        //{
+        //    unchecked
+        //    {
+        //        if (crcTable == null)
+        //        {
+        //            crcTable = new uint[256];
+
+        //            uint polynomial = 0xEDB88320;
+
+        //            for (uint i = 0; i <= 255; i++)
+        //            {
+        //                uint crc = i;
+
+        //                for (uint j = 0; j < 8; j++)
+        //                {
+        //                    crc = (crc >> 1) ^ ((crc & 1) != 0 ? polynomial : 0);
+        //                }
+
+        //                crcTable[i] = crc;
+        //            }
+
+        //            //Parallel.For(0, 255, i =>
+        //            //    {
+        //            //        uint crc = (uint)i;
+
+        //            //        for (uint j = 0; j < 8; j++)
+        //            //        {
+        //            //            crc = (crc >> 1) ^ ((crc & 1) != 0 ? polynomial : 0);
+        //            //        }
+
+        //            //        crcTable[i] = crc;
+        //            //    });
+        //        }
+        //    }
+        //}
+
+        private static object _syncCRC32 = new object();
+
+        private static FastCRC32 _crc32 = null;
+
+        private static ManualResetEvent _mre = new ManualResetEvent(false);
+
+        public static FastCRC32 GetCRC32Instance(ulong window)
+        {
+            if (_crc32 == null)
+            {
+                lock (_syncCRC32)
+                {
+                    if (_crc32 == null)
+                    {
+                        _crc32 = new FastCRC32(window);
+                    }
+                }
+            }
+
+            return _crc32;
+        }
+
+        protected FastCRC32(ulong window)
+        {
+            GenerateCRC32Table();
+            GenerateWindowTable(window);
+            windowMask = ComputeWindowMask(window);
+            _mre.Set();
+        }
+
+        private void GenerateCRC32Table()
         {
             unchecked
             {
@@ -23,51 +92,31 @@ namespace FastCRC32
 
                     uint polynomial = 0xEDB88320;
 
-                    for (uint i = 0; i <= 255; i++)
-                    {
-                        uint crc = i;
+                    //for (uint i = 0; i <= 255; i++)
+                    //{
+                    //    uint crc = i;
 
-                        for (uint j = 0; j < 8; j++)
+                    //    for (uint j = 0; j < 8; j++)
+                    //    {
+                    //        crc = (crc >> 1) ^ ((crc & 1) != 0 ? polynomial : 0);
+                    //    }
+
+                    //    crcTable[i] = crc;
+                    //}
+
+                    Parallel.For(0, 255, i =>
                         {
-                            crc = (crc >> 1) ^ ((crc & 1) != 0 ? polynomial : 0);
-                        }
+                            uint crc = (uint)i;
 
-                        crcTable[i] = crc;
-                    }
+                            for (uint j = 0; j < 8; j++)
+                            {
+                                crc = (crc >> 1) ^ ((crc & 1) != 0 ? polynomial : 0);
+                            }
+
+                            crcTable[i] = crc;
+                        });
                 }
             }
-        }
-
-        public FastCRC32(ulong window)
-        {
-            //GenerateCRC32Table();
-            GenerateWindowTable(window);
-            windowMask = ComputeWindowMask(window);
-        }
-
-        private void GenerateCRC32Table()
-        {
-            //unchecked
-            //{
-            //    if (crcTable == null)
-            //    {
-            //        crcTable = new uint[256];
-
-            //        uint polynomial = 0xEDB88320;
-
-            //        for (uint i = 0; i <= 255; i++)
-            //        {
-            //            uint crc = i;
-
-            //            for (uint j = 0; j < 8; j++)
-            //            {
-            //                crc = (crc >> 1) ^ ((crc & 1) != 0 ? polynomial : 0);
-            //            }
-
-            //            crcTable[i] = crc;
-            //        }
-            //    }
-            //}
         }
 
         private void GenerateWindowTable(ulong window)
@@ -78,17 +127,29 @@ namespace FastCRC32
                 {
                     windowTable = new uint[256];
 
-                    for (uint i = 0; i <= 255; i++)
-                    {
-                        uint crc = crcTable[i];
+                    //for (uint i = 0; i <= 255; i++)
+                    //{
+                    //    uint crc = crcTable[i];
 
-                        for (uint j = 0; j < window; j++)
+                    //    for (uint j = 0; j < window; j++)
+                    //    {
+                    //        crc = ((crc >> 8) & 0x00ffffff) ^ crcTable[(byte)crc];
+                    //    }
+
+                    //    windowTable[i] = crc;
+                    //}
+
+                    Parallel.For(0, 255, i =>
                         {
-                            crc = ((crc >> 8) & 0x00ffffff) ^ crcTable[(byte)crc];
-                        }
+                            uint crc = crcTable[i];
 
-                        windowTable[i] = crc;
-                    }
+                            for (uint j = 0; j < window; j++)
+                            {
+                                crc = ((crc >> 8) & 0x00ffffff) ^ crcTable[(byte)crc];
+                            }
+
+                            windowTable[i] = crc;
+                        });
                 }
             }
         }
@@ -120,7 +181,7 @@ namespace FastCRC32
             }
         }
 
-        public uint CRCUpdateChar(uint crc, char ch)
+        private uint CRCUpdateChar(uint crc, char ch)
         {
             unchecked
             {
@@ -130,6 +191,7 @@ namespace FastCRC32
 
         public uint CRCUpdateBlock(uint crc, uint length, byte[] buffer, uint start)
         {
+            _mre.WaitOne();
             unchecked
             {
                 while (length-- > 0)
@@ -143,6 +205,7 @@ namespace FastCRC32
 
         public uint CRCUpdateBlock(uint crc, uint length)
         {
+            _mre.WaitOne();
             unchecked
             {
                 while (length-- > 0)
@@ -159,6 +222,7 @@ namespace FastCRC32
         // is removed using the windowtable.
         public uint CRCSlideChar(uint crc, byte chNew, byte chOld)
         {
+            _mre.WaitOne();
             unchecked
             {
                 return ((crc >> 8) & 0x00ffffff) ^ crcTable[(byte)crc ^ chNew] ^ windowTable[chOld];

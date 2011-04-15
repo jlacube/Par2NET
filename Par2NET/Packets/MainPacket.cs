@@ -50,6 +50,12 @@ namespace Par2NET.Packets
 
             // setid calculation and fileids insertion will occur in Par2RecoverySet.OpenSourceFiles method
 
+            System.Threading.Tasks.Task.Factory.StartNew((b) =>
+            {
+                //FastCRC32.FastCRC32 crc32 = new FastCRC32.FastCRC32((ulong)b);
+                FastCRC32.FastCRC32 crc32 = FastCRC32.FastCRC32.GetCRC32Instance((ulong)b);
+            }, tmpPacket.blocksize);
+
             return tmpPacket;
         }
 
@@ -77,7 +83,8 @@ namespace Par2NET.Packets
 
             System.Threading.Tasks.Task.Factory.StartNew((b) =>
             {
-                FastCRC32.FastCRC32 crc32 = new FastCRC32.FastCRC32((ulong)b);
+                //FastCRC32.FastCRC32 crc32 = new FastCRC32.FastCRC32((ulong)b);
+                FastCRC32.FastCRC32 crc32 = FastCRC32.FastCRC32.GetCRC32Instance((ulong)b);
             }, tmpPacket.blocksize);
 
             return tmpPacket;
