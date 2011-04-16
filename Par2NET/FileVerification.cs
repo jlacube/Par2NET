@@ -8,6 +8,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace Par2NET
 {
@@ -255,8 +256,12 @@ namespace Par2NET
             // Finish computation of the full file hash
             // Store it in the description
             //this.FileDescriptionPacket.hashfull = contextfull.TransformFinalBlock(new byte[] {}, 0, 0);
+            contextfullAvailable.WaitOne();
             this.FileDescriptionPacket.hashfull = contextfull.Hash;
         }
+
+        private static object contextfullLock = new object();
+        private static ManualResetEvent contextfullAvailable = new ManualResetEvent(false);
 
         internal void UpdateHashes(uint blocknumber, byte[] buffer, ulong length)
         {
@@ -275,17 +280,25 @@ namespace Par2NET
 
                         Debug.Assert(contextfull != null);
 
-                        if (blocknumber < blockcount - 1)
-                            contextfull.TransformBlock(buffer, 0, (int)length, null, 0);
-                        else
-                            contextfull.TransformFinalBlock(buffer, 0, (int)length);
+                        lock (contextfullLock)
+                        {
+                            if (blocknumber < blockcount - 1)
+                            {
+                                contextfull.TransformBlock(buffer, 0, (int)length, null, 0);
+                            }
+                            else
+                            {
+                                contextfull.TransformFinalBlock(buffer, 0, (int)length);
+                                contextfullAvailable.Set();
+                            }
+                        }
                     });
 
                 Task.WaitAll(crc32task, blockhashtask);
 
                 this.FileVerificationPacket.SetBlockHashAndCRC(blocknumber, blockhashtask.Result, crc32task.Result);
 
-                Task.WaitAll(md5fulltask);
+                //Task.WaitAll(md5fulltask);
                 //uint blockcrc = (uint)~0 ^ crc32.CRCUpdateBlock((uint)~0, (uint)length, buffer, 0);
 
                 //MD5 blockcontext = MD5.Create();

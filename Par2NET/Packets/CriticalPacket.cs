@@ -40,7 +40,7 @@ namespace Par2NET.Packets
                 case "system.byte[]":
                     bw.Write((byte[])obj);
                     break;
-                case "fileverificationentry":
+                case "par2net.packets.fileverificationentry":
                     FileVerificationEntry entry = (FileVerificationEntry)obj;
                     bw.Write(entry.hash);
                     bw.Write(entry.crc);

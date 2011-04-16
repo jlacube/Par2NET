@@ -61,7 +61,7 @@
       <LaunchMethod>Executable</LaunchMethod>
       <ExecutablePath>C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET.Console\bin\Release\Par2NET.Console.exe</ExecutablePath>
       <StartupDirectory>C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET.Console\bin\Release\</StartupDirectory>
-      <Arguments>/mtio- /mtcpu+ /a:ParVerify /rf:"C:\Users\Jerome\Documents\5150.Rue.Des.Ormes.LIMITED.FRENCHDVDRIP.XVID.AC3-TBoss\5150.par2"</Arguments>
+      <Arguments>/if:"C:\Users\Jerome\Documents\BigCreate\5150.Rue.Des.Ormes.LIMITED.FRENCHDVDRIP.XVID.AC3-TBoss.part01.rar" /if:"C:\Users\Jerome\Documents\BigCreate\5150.Rue.Des.Ormes.LIMITED.FRENCHDVDRIP.XVID.AC3-TBoss.part02.rar" /if:"C:\Users\Jerome\Documents\BigCreate\5150.Rue.Des.Ormes.LIMITED.FRENCHDVDRIP.XVID.AC3-TBoss.part03.rar" /action:ParCreate /rbc:10 /mtcpu+ /mtio- /bs:3840000</Arguments>
       <NetAppHost>IIS</NetAppHost>
       <NetBrowser>InternetExplorer</NetBrowser>
       <ExcludeSmallFuncs>true</ExcludeSmallFuncs>
@@ -260,6 +260,12 @@
     </Report>
     <Report>
       <Path>C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET.Console110324(1).vsp</Path>
+    </Report>
+    <Report>
+      <Path>C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET.Console110413.vsp</Path>
+    </Report>
+    <Report>
+      <Path>C:\Users\Jerome\Documents\Visual Studio 2010\Projects\Par2NET\Par2NET.Console110414.vsp</Path>
     </Report>
   </Reports>
   <Launches>

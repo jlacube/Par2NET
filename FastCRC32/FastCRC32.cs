@@ -10,8 +10,7 @@ namespace FastCRC32
     public class FastCRC32
     {
         private static uint[] crcTable = null;
-        private uint[] windowTable = null;
-        private static bool not_init = true;
+        private static uint[] windowTable = null;
 
         public uint windowMask = 0;
 
@@ -58,12 +57,19 @@ namespace FastCRC32
 
         private static ManualResetEvent _mre = new ManualResetEvent(false);
 
+        private static bool initializing = false;
+
         public static FastCRC32 GetCRC32Instance(ulong window)
         {
             if (_crc32 == null)
             {
                 lock (_syncCRC32)
                 {
+                    if (initializing)
+                        _mre.WaitOne();
+
+                    initializing = true;
+
                     if (_crc32 == null)
                     {
                         _crc32 = new FastCRC32(window);
@@ -126,34 +132,31 @@ namespace FastCRC32
         {
             unchecked
             {
-                if (windowTable == null)
-                {
-                    windowTable = new uint[256];
+                windowTable = new uint[256];
 
-                    //for (uint i = 0; i <= 255; i++)
-                    //{
-                    //    uint crc = crcTable[i];
+                //for (uint i = 0; i <= 255; i++)
+                //{
+                //    uint crc = crcTable[i];
 
-                    //    for (uint j = 0; j < window; j++)
-                    //    {
-                    //        crc = ((crc >> 8) & 0x00ffffff) ^ crcTable[(byte)crc];
-                    //    }
+                //    for (uint j = 0; j < window; j++)
+                //    {
+                //        crc = ((crc >> 8) & 0x00ffffff) ^ crcTable[(byte)crc];
+                //    }
 
-                    //    windowTable[i] = crc;
-                    //}
+                //    windowTable[i] = crc;
+                //}
 
-                    Parallel.For(0, 255, i =>
+                Parallel.For(0, 255, i =>
+                    {
+                        uint crc = crcTable[i];
+
+                        for (uint j = 0; j < window; j++)
                         {
-                            uint crc = crcTable[i];
+                            crc = ((crc >> 8) & 0x00ffffff) ^ crcTable[(byte)crc];
+                        }
 
-                            for (uint j = 0; j < window; j++)
-                            {
-                                crc = ((crc >> 8) & 0x00ffffff) ^ crcTable[(byte)crc];
-                            }
-
-                            windowTable[i] = crc;
-                        });
-                }
+                        windowTable[i] = crc;
+                    });
             }
         }
 
@@ -161,24 +164,19 @@ namespace FastCRC32
         {
             unchecked
             {
-                if (not_init)
+                uint result = 0xFFFFFFFF;
+
+                while (window > 0)
                 {
-                    uint result = 0xFFFFFFFF;    
+                    result = CRCUpdateChar(result, (char)0);
 
-                    while (window > 0)
-                    {
-                        result = CRCUpdateChar(result, (char)0);
-
-                        window--;
-                    }
-
-                    //result ^= ~0;
-                    result ^= 0xFFFFFFFF;
-
-                    windowMask = result;
-
-                    not_init = false;
+                    window--;
                 }
+
+                //result ^= ~0;
+                result ^= 0xFFFFFFFF;
+
+                windowMask = result;
 
                 return windowMask;
             }

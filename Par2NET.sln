@@ -16,6 +16,11 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastGaloisFields", "FastGaloisFields\FastGaloisFields\FastGaloisFields.csproj", "{2D8D74BA-12FD-47BE-A84F-D9BE25D60AB5}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{AE0B7DE2-B26B-4B31-857C-9C1250C94A6E}"
+	ProjectSection(SolutionItems) = preProject
+		Local.testsettings = Local.testsettings
+		Par2NET.vsmdi = Par2NET.vsmdi
+		TraceAndTestImpact.testsettings = TraceAndTestImpact.testsettings
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Par2NET.Interfaces", "Par2NET.Interfaces\Par2NET.Interfaces.csproj", "{FE5AAFEC-6C23-4179-8165-0720DD806688}"
 EndProject
@@ -28,7 +33,18 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GaloisFields", "GaloisField
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FastGaloisFieldsNative", "FastGaloisFields\FastGaloisFieldsNative\FastGaloisFieldsNative.vcxproj", "{7C9526A0-529E-4A91-A76C-367535B8A6D7}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{3D7D878F-3E08-478F-8590-25853B435E4D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "UnitTests", "UnitTests", "{014C107B-55DB-4BC3-A8D6-980910334673}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ChainTests", "ChainTests", "{467383F1-6E22-4FB3-93FD-4F60588A1760}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FullChainTests", "FullChainTests\FullChainTests.csproj", "{E4F0D65F-BD57-46D0-99B9-49E2B154BEB1}"
+EndProject
 Global
+	GlobalSection(TestCaseManagementSettings) = postSolution
+		CategoryFile = Par2NET.vsmdi
+	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Debug|Mixed Platforms = Debug|Mixed Platforms
@@ -162,6 +178,20 @@ Global
 		{7C9526A0-529E-4A91-A76C-367535B8A6D7}.Release|x64.ActiveCfg = Release|x64
 		{7C9526A0-529E-4A91-A76C-367535B8A6D7}.Release|x64.Build.0 = Release|x64
 		{7C9526A0-529E-4A91-A76C-367535B8A6D7}.Release|x86.ActiveCfg = Release|Win32
+		{E4F0D65F-BD57-46D0-99B9-49E2B154BEB1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E4F0D65F-BD57-46D0-99B9-49E2B154BEB1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E4F0D65F-BD57-46D0-99B9-49E2B154BEB1}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{E4F0D65F-BD57-46D0-99B9-49E2B154BEB1}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{E4F0D65F-BD57-46D0-99B9-49E2B154BEB1}.Debug|Win32.ActiveCfg = Debug|Any CPU
+		{E4F0D65F-BD57-46D0-99B9-49E2B154BEB1}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E4F0D65F-BD57-46D0-99B9-49E2B154BEB1}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E4F0D65F-BD57-46D0-99B9-49E2B154BEB1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E4F0D65F-BD57-46D0-99B9-49E2B154BEB1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E4F0D65F-BD57-46D0-99B9-49E2B154BEB1}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{E4F0D65F-BD57-46D0-99B9-49E2B154BEB1}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{E4F0D65F-BD57-46D0-99B9-49E2B154BEB1}.Release|Win32.ActiveCfg = Release|Any CPU
+		{E4F0D65F-BD57-46D0-99B9-49E2B154BEB1}.Release|x64.ActiveCfg = Release|Any CPU
+		{E4F0D65F-BD57-46D0-99B9-49E2B154BEB1}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -175,5 +205,8 @@ Global
 		{5F9D08C3-75CD-49AE-9F7D-F564AF67975A} = {21F6E570-1521-453F-941A-1824E49AC0F1}
 		{C85D3FAD-7809-45E6-9302-DD9D3567B703} = {21F6E570-1521-453F-941A-1824E49AC0F1}
 		{7C9526A0-529E-4A91-A76C-367535B8A6D7} = {21F6E570-1521-453F-941A-1824E49AC0F1}
+		{014C107B-55DB-4BC3-A8D6-980910334673} = {3D7D878F-3E08-478F-8590-25853B435E4D}
+		{467383F1-6E22-4FB3-93FD-4F60588A1760} = {3D7D878F-3E08-478F-8590-25853B435E4D}
+		{E4F0D65F-BD57-46D0-99B9-49E2B154BEB1} = {467383F1-6E22-4FB3-93FD-4F60588A1760}
 	EndGlobalSection
 EndGlobal
