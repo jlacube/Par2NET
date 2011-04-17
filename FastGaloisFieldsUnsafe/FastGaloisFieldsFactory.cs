@@ -10,8 +10,8 @@ namespace FastGaloisFieldsUnsafe
     {
         public static IFastGaloisFieldsProcessor GetProcessor()
         {
-            return FastGaloisFieldsNativeProcessor.GetInstance;
-            //return FastGaloisFieldsUnsafeProcessor.GetInstance;
+            //return FastGaloisFieldsNativeProcessor.GetInstance;
+            return FastGaloisFieldsUnsafeProcessor.GetInstance;
         }
     }
 }

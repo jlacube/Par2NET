@@ -947,6 +947,7 @@ namespace Par2NET
                 lCurrentStartBlockNo = lNextStartBlockNo;
             }
 
+            // TO REMOVE ASAP - Big speed improvement here !!!
             Task.WaitAll(tasks.ToArray());
 
             return rv;

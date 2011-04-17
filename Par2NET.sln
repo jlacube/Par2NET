@@ -39,7 +39,20 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "UnitTests", "UnitTests", "{
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ChainTests", "ChainTests", "{467383F1-6E22-4FB3-93FD-4F60588A1760}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FullChainTests", "FullChainTests\FullChainTests.csproj", "{E4F0D65F-BD57-46D0-99B9-49E2B154BEB1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FullChainTests", "Tests\FullChainTests\FullChainTests.csproj", "{E4F0D65F-BD57-46D0-99B9-49E2B154BEB1}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Files", "Files", "{6718731A-D510-4BB7-B80E-12EF181CF3DC}"
+	ProjectSection(SolutionItems) = preProject
+		Tests\Files\EntLib50.chm = Tests\Files\EntLib50.chm
+		Tests\Files\EntLib50.chm.par2 = Tests\Files\EntLib50.chm.par2
+		Tests\Files\EntLib50.chm.vol0+1.PAR2 = Tests\Files\EntLib50.chm.vol0+1.PAR2
+		Tests\Files\EntLib50.chm.vol1+2.PAR2 = Tests\Files\EntLib50.chm.vol1+2.PAR2
+		Tests\Files\EntLib50.chm.vol3+3.PAR2 = Tests\Files\EntLib50.chm.vol3+3.PAR2
+		Tests\Files\EntLib50.chm.vol6+4.PAR2 = Tests\Files\EntLib50.chm.vol6+4.PAR2
+		Tests\Files\EntLib50_bad.chm = Tests\Files\EntLib50_bad.chm
+		Tests\Files\EntLib50_copy.chm = Tests\Files\EntLib50_copy.chm
+		Tests\Files\EntLib50_copy2.chm = Tests\Files\EntLib50_copy2.chm
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(TestCaseManagementSettings) = postSolution
@@ -207,6 +220,7 @@ Global
 		{7C9526A0-529E-4A91-A76C-367535B8A6D7} = {21F6E570-1521-453F-941A-1824E49AC0F1}
 		{014C107B-55DB-4BC3-A8D6-980910334673} = {3D7D878F-3E08-478F-8590-25853B435E4D}
 		{467383F1-6E22-4FB3-93FD-4F60588A1760} = {3D7D878F-3E08-478F-8590-25853B435E4D}
+		{6718731A-D510-4BB7-B80E-12EF181CF3DC} = {3D7D878F-3E08-478F-8590-25853B435E4D}
 		{E4F0D65F-BD57-46D0-99B9-49E2B154BEB1} = {467383F1-6E22-4FB3-93FD-4F60588A1760}
 	EndGlobalSection
 EndGlobal

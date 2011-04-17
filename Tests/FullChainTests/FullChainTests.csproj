@@ -33,6 +33,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Microsoft.VisualStudio.QualityTools.UnitTestFramework, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL" />
     <Reference Include="System" />
     <Reference Include="System.Core">
       <RequiredTargetFramework>3.5</RequiredTargetFramework>
@@ -44,14 +45,15 @@
     </CodeAnalysisDependentAssemblyPaths>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="FullChain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Par2NET.Interfaces\Par2NET.Interfaces.csproj">
+    <ProjectReference Include="..\..\Par2NET.Interfaces\Par2NET.Interfaces.csproj">
       <Project>{FE5AAFEC-6C23-4179-8165-0720DD806688}</Project>
       <Name>Par2NET.Interfaces</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Par2NET\Par2NET.csproj">
+    <ProjectReference Include="..\..\Par2NET\Par2NET.csproj">
       <Project>{E05C1D72-80B5-4B77-829D-CCE04D545F65}</Project>
       <Name>Par2NET</Name>
     </ProjectReference>
