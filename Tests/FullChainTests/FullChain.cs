@@ -183,7 +183,7 @@ namespace FullChainTests
             string[] args = new string[] {
                 "/rf:" + Path.Combine(TestContext.TestDeploymentDir, "VerifyKO_1FileNoMT", "EntLib50.chm.par2"),
                 "/action:ParVerify",
-                "/mtcpu+",
+                "/mtcpu-",
                 "/mtio-"
             };
 
